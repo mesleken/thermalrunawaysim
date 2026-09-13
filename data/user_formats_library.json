@@ -1,0 +1,13 @@
+{
+    "formats": {
+        "50000": {
+            "radius": 0.025,
+            "height": 0.1,
+            "mass": 0.45,
+            "casing_thickness": 0.0005,
+            "cp": 1050.0,
+            "type": "cylindrical",
+            "source_type": "user_defined"
+        }
+    }
+}

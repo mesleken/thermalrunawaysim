@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-09-13",
+  "description": "Pil Paketi Termal Kaçak Simülatörü için hücreler arası separatör, dolgu ve yapısal malzeme kütüphanesi.",
+  "materials": [
+    {
+      "material_id": "air_gap",
+      "name": "Durgun Hava Boşluğu (Air Gap)",
+      "type": "gap",
+      "k_thermal_W_per_m_K": 0.026,
+      "density_kg_per_m3": 1.2,
+      "cp_J_per_kg_K": 1005.0,
+      "emissivity": 0.90,
+      "description": "Hücreler arasında hiçbir katı separatör bulunmadığı durumdaki doğal hava boşluğu iletim katsayısı."
+    },
+    {
+      "material_id": "aerogel_insulation",
+      "name": "Silika Aerojel Yalıtım Levhası (Aerogel Blanket)",
+      "type": "separator",
+      "k_thermal_W_per_m_K": 0.018,
+      "density_kg_per_m3": 160.0,
+      "cp_J_per_kg_K": 950.0,
+      "emissivity": 0.85,
+      "max_service_temp_C": 650.0,
+      "description": "Aşırı düşük ısıl iletkenliğe sahip ultra yüksek performanslı termal bariyer malzemesi."
+    },
+    {
+      "material_id": "mica_sheet",
+      "name": "Mika Levha (Phlogopite Mica Sheet)",
+      "type": "separator",
+      "k_thermal_W_per_m_K": 0.25,
+      "density_kg_per_m3": 2100.0,
+      "cp_J_per_kg_K": 880.0,
+      "emissivity": 0.70,
+      "max_service_temp_C": 1000.0,
+      "description": "Yüksek alev ve ark dayanımlı standart endüstriyel termal kaçak bariyeri."
+    },
+    {
+      "material_id": "silicone_pad",
+      "name": "Termal İletken Silikon Ped (Thermal Gap Filler)",
+      "type": "interface",
+      "k_thermal_W_per_m_K": 1.5,
+      "density_kg_per_m3": 2400.0,
+      "cp_J_per_kg_K": 1000.0,
+      "emissivity": 0.90,
+      "max_service_temp_C": 200.0,
+      "description": "Hücre tabanı ile soğutma plakası arasındaki temas direncini düşüren elastik ped."
+    },
+    {
+      "material_id": "aluminum_6061",
+      "name": "Alüminyum 6061 (Kasa / Soğutma Plakası)",
+      "type": "structural",
+      "k_thermal_W_per_m_K": 167.0,
+      "density_kg_per_m3": 2700.0,
+      "cp_J_per_kg_K": 896.0,
+      "emissivity": 0.25,
+      "description": "Hücre modül taşıyıcı çerçevesi ve alt soğutma plakası metal malzemesi."
+    },
+    {
+      "material_id": "epoxy_potting",
+      "name": "Poliüretan / Epoksi Dolgu Köpüğü (Potting Compound)",
+      "type": "gap",
+      "k_thermal_W_per_m_K": 0.18,
+      "density_kg_per_m3": 650.0,
+      "cp_J_per_kg_K": 1300.0,
+      "emissivity": 0.85,
+      "description": "Hücreler arası yapısal rijitleştirme ve geciktirici yangın bariyeri dolgusu."
+    }
+  ]
+}

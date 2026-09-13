@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battery Thermal Runaway Workbench | CAE Mühendislik Platformu</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js for high-fidelity temperature curves -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- ================= TOP BAR ================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">TR</div>
+      <div>
+        <div class="brand-title">Thermal Runaway</div>
+        <div class="brand-subtitle">BATTERY THERMAL WORKBENCH</div>
+      </div>
+    </div>
+
+    <div class="project-info">
+      <span class="project-tag">MODÜL</span>
+      <span class="project-name" id="projectTitle">21700 / NMC811 Batarya Modülü</span>
+      <span class="badge badge-validated" id="badgeValidation" title="Literatür ARC/DSC Kalibrasyonu">✓ Literatür Kalibreli</span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="btn ghost-btn" id="btnOpenLibManager">
+        <span>📚</span> Kütüphane Yöneticisi
+      </button>
+
+      <button type="button" class="btn ghost-btn" id="btnOpenChartsModal">
+        <span>📈</span> Sıcaklık Grafiği
+      </button>
+
+      <a id="btnDownloadReport" href="#" target="_blank" class="btn ghost-btn download-btn" style="display:none;">
+        <span>📄</span> PDF Raporu
+      </a>
+
+      <button type="button" class="btn run-btn" id="btnTopRunSim">
+        <span class="btn-icon">⚡</span> Simülasyonu Başlat
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= WORKSPACE ================= -->
+  <main class="workspace">
+
+    <!-- SOL PANEL: PROJE AĞACI (SIMULATION TREE) -->
+    <aside class="sidebar left-tree">
+      <div class="panel-header">
+        <span>PROJE AĞACI</span>
+        <span class="tree-badge">CAE</span>
+      </div>
+
+      <div class="tree-scroll">
+        <!-- MODEL BÖLÜMÜ -->
+        <div class="tree-section">
+          <div class="tree-title">MODEL TANIMI</div>
+
+          <div class="tree-item active" data-panel="geometry" id="treeItemGeometry">
+            <span class="tree-icon">▣</span>
+            <span class="tree-label">Geometri & Dizilim</span>
+            <span class="tree-status status-ready" title="Yapılandırıldı">✓</span>
+          </div>
+
+          <div class="tree-item" data-panel="chemistry" id="treeItemChemistry">
+            <span class="tree-icon">◉</span>
+            <span class="tree-label">Hücre Kimyası</span>
+            <span class="tree-status status-ready" title="Yapılandırıldı">✓</span>
+          </div>
+
+          <div class="tree-item" data-panel="adv_physics" id="treeItemAdvPhysics">
+            <span class="tree-icon">⚛</span>
+            <span class="tree-label">Gelişmiş Fizik (Kinetik)</span>
+            <span class="tree-status" id="statusAdvPhysicsBadge">○</span>
+          </div>
+
+          <div class="tree-item" data-panel="thermal" id="treeItemThermal">
+            <span class="tree-icon">◌</span>
+            <span class="tree-label">Termal & Bariyerler</span>
+            <span class="tree-status status-ready" title="Yapılandırıldı">✓</span>
+          </div>
+
+          <div class="tree-item" data-panel="cooling" id="treeItemCooling">
+            <span class="tree-icon">❄</span>
+            <span class="tree-label">Aktif Soğutma</span>
+            <span class="tree-status" id="statusCoolingBadge" title="İsteğe Bağlı">○</span>
+          </div>
+
+          <div class="tree-item" data-panel="excitation" id="treeItemExcitation">
+            <span class="tree-icon">⚡</span>
+            <span class="tree-label">Abuse & Tetikleme</span>
+            <span class="tree-status status-ready" title="Yapılandırıldı">✓</span>
+          </div>
+        </div>
+
+        <!-- SOLUTION BÖLÜMÜ -->
+        <div class="tree-section">
+          <div class="tree-title">ÇÖZÜM & ANALİZ</div>
+
+          <div class="tree-item" data-panel="simulation" id="treeItemSimulation">
+            <span class="tree-icon">▶</span>
+            <span class="tree-label">Çözücü & Zaman</span>
+            <span class="tree-status status-ready" title="Hazır">✓</span>
+          </div>
+
+          <div class="tree-item" data-panel="design_study" id="treeItemDesignStudy">
+            <span class="tree-icon">📊</span>
+            <span class="tree-label">Tasarım Çalışması (Sweep)</span>
+            <span class="tree-status status-ready" title="Hazır">✓</span>
+          </div>
+
+          <div class="tree-item" data-panel="results" id="treeItemResults">
+            <span class="tree-icon">▤</span>
+            <span class="tree-label">Sonuçlar & Rapor</span>
+            <span class="tree-status" id="statusResultsBadge" title="Bekleniyor">○</span>
+          </div>
+        </div>
+
+        <!-- HÜCRE İNCELEME BÖLÜMÜ (Aktif hücre seçildiğinde açılır) -->
+        <div class="tree-section" id="treeSectionCellInspector" style="display:none;">
+          <div class="tree-title">SEÇİLİ BİLEŞEN</div>
+          <div class="tree-item tree-item-highlight" data-panel="cell_inspector" id="treeItemCellInspector">
+            <span class="tree-icon">🔬</span>
+            <span class="tree-label" id="treeLabelCellInspector">Hücre #0 İnceleme</span>
+            <span class="tree-status status-active">●</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="solver-tag">
+          <span class="dot live"></span> SciPy LSODA Stiff Solver
+        </div>
+      </div>
+    </aside>
+
+    <!-- ORTA PANEL: VİZUALİZASYON ALANI (BATTERY WORKSPACE) -->
+    <section class="viewer-container">
+      <!-- Toolbar -->
+      <div class="viewer-toolbar">
+        <div class="tool-group">
+          <button type="button" class="tool active" id="btnView3D">3D Modül</button>
+          <button type="button" class="tool" id="btnView2D">2D Termal Ağ</button>
+          <button type="button" class="tool" id="btnViewHeatmap">Isı Haritası</button>
+        </div>
+
+        <div class="tool-group info-tools">
+          <span class="viewer-stats" id="viewerPackStats">3x3 (9 Hücre) • 18650</span>
+          <button type="button" class="tool" id="btnResetView" title="Görünümü Sıfırla">⟳ Sıfırla</button>
+          <button type="button" class="tool" id="btnToggleLabels" title="Etiketleri Göster/Gizle">🏷️ Etiket</button>
+        </div>
+      </div>
+
+      <!-- 3D Perspective Visualizer -->
+      <div id="battery3DViewer" class="battery-3d-workspace">
+        <div class="pack-3d-stage" id="pack3dStage">
+          <!-- 3D Cells generated dynamically -->
+        </div>
+      </div>
+
+      <!-- 2D Canvas Visualizer -->
+      <div id="battery2DViewer" class="battery-2d-workspace" style="display:none;">
+        <canvas id="packCanvas" width="700" height="420"></canvas>
+      </div>
+
+      <!-- Quick Hint Overlay -->
+      <div class="viewer-hint" id="viewerHint">
+        💡 Bir hücreye tıklayarak parametrelerini sağ panelde inceleyin veya tetikleyici yapın.
+      </div>
+
+      <!-- Temperature Legend -->
+      <div class="temperature-legend">
+        <div class="legend-header">
+          <span>SICAKLIK DAĞILIMI</span>
+          <span id="legendMaxTemp">Tmax: -- °C</span>
+        </div>
+        <div class="gradient-bar"></div>
+        <div class="legend-ticks">
+          <span>25°C</span>
+          <span>60°C</span>
+          <span>155°C (Onset)</span>
+          <span>210°C (TR)</span>
+          <span>800°C+</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SAĞ PANEL: CONTEXT PROPERTIES (DİNAMİK ÖZELLİK PANELİ) -->
+    <aside class="sidebar right-properties">
+      <div class="panel-header">
+        <span id="propertiesTitle">GEOMETRİ & DİZİLİM</span>
+        <span class="props-badge" id="propertiesBadge">MODEL</span>
+      </div>
+
+      <div class="properties-scroll">
+        <!-- FORM CONTAINER: All properties stay in sync -->
+        <form id="simConfigForm">
+
+          <!-- 1. GEOMETRY PANEL -->
+          <div class="props-section" id="panelGeometry">
+            <p class="props-desc">Batarya modülünün hücre formatını, matris satır/sütun ölçülerini ve aralık mesafelerini belirleyin.</p>
+
+            <div class="field-group">
+              <label for="selectFormat">Hücre Formatı:</label>
+              <div class="input-with-button">
+                <select id="selectFormat" name="cell_format">
+                  <option value="18650" selected>18650 Silindirik (18x65 mm)</option>
+                  <option value="21700">21700 Silindirik (21x70 mm)</option>
+                  <option value="4680">4680 Silindirik (46x80 mm)</option>
+                  <option value="prismatic">Prizmatik LFP (148x98x27 mm)</option>
+                </select>
+                <button type="button" id="btnAddCustomFormat" class="btn-micro" title="Yeni Özel Format Ekle">+</button>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label for="inputRows">Satır (Rows):</label>
+                <input type="number" id="inputRows" name="rows" value="3" min="1" max="10" required>
+              </div>
+              <div class="field-group">
+                <label for="inputCols">Sütun (Cols):</label>
+                <input type="number" id="inputCols" name="cols" value="3" min="1" max="10" required>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label for="inputSpacingX">X Boşluk (mm):</label>
+                <input type="number" id="inputSpacingX" name="spacing_x_mm" value="2.0" step="0.5" min="0.5" max="30">
+              </div>
+              <div class="field-group">
+                <label for="inputSpacingY">Y Boşluk (mm):</label>
+                <input type="number" id="inputSpacingY" name="spacing_y_mm" value="2.0" step="0.5" min="0.5" max="30">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="checkbox-container">
+                <input type="checkbox" id="checkboxStaggered" name="staggered">
+                <span class="custom-checkbox"></span>
+                <span>Üçgen (Staggered / Hexagonal) Dizilim</span>
+              </label>
+            </div>
+
+            <div class="metric-mini-card">
+              <div class="mini-card-title">HESAPLANAN MODÜL GEOMETRİSİ</div>
+              <div class="mini-card-row">
+                <span>Toplam Hücre Sayısı:</span>
+                <strong id="calcTotalCells">9 Hücre</strong>
+              </div>
+              <div class="mini-card-row">
+                <span>Modül En x Boy:</span>
+                <strong id="calcPackDims">~62 x 62 mm</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. CHEMISTRY PANEL -->
+          <div class="props-section" id="panelChemistry" style="display:none;">
+            <p class="props-desc">Hücrenin elektrot kinetik parametrelerini (Arrhenius ekzotermik reaksiyon modeli) seçin veya özel kimya ekleyin.</p>
+
+            <div class="field-group">
+              <label for="selectChemistry">Hücre Kimyası:</label>
+              <div class="input-with-button">
+                <select id="selectChemistry" name="chemistry_id">
+                  <option value="NMC_generic_v1" selected>NMC Genel (155°C Onset, 780 J/g)</option>
+                  <option value="NMC811_high_energy_v1">NMC811 Yüksek Nikel (138°C Onset, 920 J/g)</option>
+                  <option value="LFP_generic_v1">LFP Fosfat (215°C Onset, 340 J/g)</option>
+                </select>
+                <button type="button" id="btnAddCustomChem" class="btn-micro" title="Yeni Özel Kimya Ekle">+</button>
+              </div>
+            </div>
+
+            <div class="props-subcard" id="chemDetailsCard">
+              <div class="subcard-header">KİNETİK ARRHENIUS PARAMETRELERİ</div>
+              <div class="props-data-grid">
+                <div class="data-item">
+                  <span class="data-label">Onset Sıcaklığı:</span>
+                  <span class="data-value" id="chemValOnset">155 °C</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Tetikleme (Trigger):</span>
+                  <span class="data-value" id="chemValTrigger">210 °C</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Entalpi (ΔH):</span>
+                  <span class="data-value" id="chemValDeltaH">780 J/g</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Aktivasyon (Ea):</span>
+                  <span class="data-value" id="chemValEa">128.5 kJ/mol</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GELİŞMİŞ FİZİK VE KİNETİK PANELİ (ADVANCED PHYSICS MODE) -->
+          <div class="props-section" id="panelAdvPhysics" style="display:none;">
+            <p class="props-desc">Arrhenius kinetik reaksiyon parametrelerini, yarı-ampirik gaz venting konveksiyonunu ve yüzey ışınım emmisivitesini doğrudan ayarlayın.</p>
+
+            <div class="field-group">
+              <label class="checkbox-container">
+                <input type="checkbox" id="checkboxAdvPhysics" name="advanced_physics_enabled">
+                <span class="custom-checkbox"></span>
+                <span style="font-weight:700; color:#38bdf8;">Gelişmiş Fizik Parametrelerini Etkinleştir</span>
+              </label>
+            </div>
+
+            <div id="advPhysicsFields" style="opacity:0.4; pointer-events:none; transition:opacity 0.2s ease;">
+              <div class="props-subcard" style="margin-top:8px;">
+                <div class="subcard-header">1. KİNETİK ARRHENIUS DEĞERLERİ</div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label for="inputAdvA">Frekans Çarpanı A (1/s):</label>
+                    <input type="number" step="any" id="inputAdvA" name="custom_A_pre_exponential" placeholder="2.5e12">
+                  </div>
+                  <div class="field-group">
+                    <label for="inputAdvEa">Aktivasyon Ea (J/mol):</label>
+                    <input type="number" step="100" id="inputAdvEa" name="custom_Ea_J_per_mol" placeholder="128500">
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label for="inputAdvDeltaH">Entalpi ΔH (J/g):</label>
+                    <input type="number" step="10" id="inputAdvDeltaH" name="custom_delta_H_J_per_g" placeholder="780">
+                  </div>
+                  <div class="field-group">
+                    <label for="inputAdvN">Reaksiyon Mertebesi n:</label>
+                    <input type="number" step="0.1" id="inputAdvN" name="custom_reaction_order_n" value="1.0" min="0.1" max="3.0">
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label for="inputAdvRatio">Aktif Kütle Oranı (0 - 1):</label>
+                  <input type="number" step="0.01" id="inputAdvRatio" name="custom_active_mass_ratio" placeholder="0.58" min="0.05" max="1.0">
+                </div>
+              </div>
+
+              <div class="props-subcard" style="margin-top:10px;">
+                <div class="subcard-header">2. EJECTA, GAZ VENTING & IŞINIM</div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label for="inputAdvHvent">h Venting (W/m²K):</label>
+                    <input type="number" step="10" id="inputAdvHvent" name="h_vent_W_per_m2_K" value="100" min="0" max="2000">
+                  </div>
+                  <div class="field-group">
+                    <label for="inputAdvTgas">Gaz Sıcaklığı (°C):</label>
+                    <input type="number" step="50" id="inputAdvTgas" name="T_vent_gas_C" placeholder="Oto (~1000°C)">
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label for="inputAdvEmissivity">Yüzey Emisivitesi (ε):</label>
+                  <input type="number" step="0.05" id="inputAdvEmissivity" name="surface_emissivity" value="0.85" min="0.1" max="1.0">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. THERMAL PANEL -->
+          <div class="props-section" id="panelThermal" style="display:none;">
+            <p class="props-desc">Hücreler arası izolasyon bariyeri, hava/dolgu malzemesi ve elektriksel busbar iletimini belirleyin.</p>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label for="inputTamb">Ortam Sıcaklığı (°C):</label>
+                <input type="number" id="inputTamb" name="T_ambient_C" value="25.0" step="1">
+              </div>
+              <div class="field-group">
+                <label for="inputBusbar">Busbar İletkenliği (W/K):</label>
+                <input type="number" id="inputBusbar" name="busbar_conductance_W_per_K" value="0.6" step="0.1" min="0">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="selectSeparator">Hücreler Arası Separatör (Bariyer):</label>
+              <div class="input-with-button">
+                <select id="selectSeparator" name="separator_material_id">
+                  <option value="" selected>Yok (Sadece Boşluk/Dolgu)</option>
+                </select>
+                <button type="button" id="btnAddCustomMat" class="btn-micro" title="Yeni Malzeme Ekle">+</button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="inputSepThickness">Bariyer Kalınlığı (mm):</label>
+              <input type="number" id="inputSepThickness" name="separator_thickness_mm" value="1.0" step="0.5" min="0">
+            </div>
+
+            <div class="field-group">
+              <label for="selectGapMaterial">Kalan Boşluk / Dolgu Malzemesi:</label>
+              <select id="selectGapMaterial" name="gap_material_id">
+                <option value="air_gap" selected>Hava Boşluğu (0.026 W/mK)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 4. COOLING PANEL -->
+          <div class="props-section" id="panelCooling" style="display:none;">
+            <p class="props-desc">Taban soğutma plakası (cold plate) veya sıvı soğutma ceketini yapılandırın.</p>
+
+            <div class="field-group">
+              <label class="checkbox-container">
+                <input type="checkbox" id="checkboxCooling" name="active_cooling_enabled">
+                <span class="custom-checkbox"></span>
+                <span>Aktif Taban Soğutma Plakası</span>
+              </label>
+            </div>
+
+            <div id="coolingOptions" style="display:none;">
+              <div class="field-group">
+                <label for="inputHcool">h Soğutma Katsayısı (W/m²K):</label>
+                <input type="number" id="inputHcool" name="h_cooling_plate_W_per_m2_K" value="800" step="50">
+              </div>
+
+              <div class="field-group">
+                <label for="inputTcool">Soğutucu Sıvı Sıcaklığı (°C):</label>
+                <input type="number" id="inputTcool" name="T_coolant_C" value="25.0" step="1">
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. EXCITATION PANEL -->
+          <div class="props-section" id="panelExcitation" style="display:none;">
+            <p class="props-desc">Termal kaçağı tetikleyen abuse senaryosunu (harici ısıtıcı veya anlık onset) tanımlayın.</p>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label for="inputTriggerCell">Tetikleyici Hücre ID:</label>
+                <input type="number" id="inputTriggerCell" name="trigger_cell_id" value="0" min="0">
+              </div>
+              <div class="field-group">
+                <label for="selectTriggerMethod">Tetikleme Türü:</label>
+                <select id="selectTriggerMethod" name="trigger_method">
+                  <option value="thermal_pulse" selected>Harici Isı Darbesi</option>
+                  <option value="instant_onset">Anlık Başlangıç Sıcaklığı</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-row" id="groupThermalPulse">
+              <div class="field-group">
+                <label for="inputTriggerPower">Isı Gücü (Watt):</label>
+                <input type="number" id="inputTriggerPower" name="trigger_power_W" value="3500" step="100">
+              </div>
+              <div class="field-group">
+                <label for="inputTriggerDuration">Süre (saniye):</label>
+                <input type="number" id="inputTriggerDuration" name="trigger_duration_s" value="3.0" step="0.5">
+              </div>
+            </div>
+
+            <div class="field-group" id="groupInstantOnset" style="display:none;">
+              <label for="inputTriggerInitialTemp">Anlık Başlangıç Sıcaklığı (°C):</label>
+              <input type="number" id="inputTriggerInitialTemp" name="trigger_initial_temp_C" value="250.0" step="10">
+            </div>
+          </div>
+
+          <!-- 6. SIMULATION / SOLVER PANEL -->
+          <div class="props-section" id="panelSimulation" style="display:none;">
+            <p class="props-desc">SciPy LSODA diferansiyel denklem çözücüsünün zaman aralığını ve çözünürlüğünü ayarlayın.</p>
+
+            <div class="field-group">
+              <label for="inputSimTime">Simülasyon Süresi: <strong id="lblSimTime">90 s</strong></label>
+              <input type="range" id="inputSimTime" name="simulation_time_s" min="20" max="180" value="90" step="10">
+            </div>
+
+            <div class="metric-mini-card">
+              <div class="mini-card-title">ÇÖZÜCÜ YAPILANDIRMASI</div>
+              <div class="mini-card-row">
+                <span>Algoritma:</span>
+                <strong>LSODA (Stiff / Non-Stiff Otomatik)</strong>
+              </div>
+              <div class="mini-card-row">
+                <span>Çıkış Adım Sayısı:</span>
+                <strong>200 Zaman Noktası</strong>
+              </div>
+              <div class="mini-card-row">
+                <span>Ejecta & Venting:</span>
+                <strong>Aktif (Qvent Hesaplaması)</strong>
+              </div>
+            </div>
+
+            <button type="submit" id="btnSideRunSim" class="btn run-btn" style="width:100%; margin-top:16px;">
+              <span class="btn-icon">⚡</span> Simülasyonu Çalıştır
+            </button>
+          </div>
+
+          <!-- TASARIM ÇALIŞMASI PANELİ (DESIGN STUDY / PARAMETER SWEEP) -->
+          <div class="props-section" id="panelDesignStudy" style="display:none;">
+            <p class="props-desc">Farklı hücre aralıkları, separatör bariyer malzemeleri veya soğutma seviyelerini aynı anda simüle edip en güvenli tasarımı otomatik tespit edin.</p>
+
+            <div class="field-group">
+              <label for="selectSweepType">Tarama Türü (Sweep Type):</label>
+              <select id="selectSweepType">
+                <option value="spacing_sweep" selected>Hücre Aralığı Taraması (1.5, 2.0, 2.5, 3.0 mm)</option>
+                <option value="separator_sweep">Termal Bariyer Kıyaslaması (Hava, Mika, Aerojel)</option>
+                <option value="cooling_sweep">Soğutma Kapasitesi Kıyaslaması (Pasif, 400, 800, 1500 W/m²K)</option>
+              </select>
+            </div>
+
+            <div class="metric-mini-card" id="sweepInfoCard">
+              <div class="mini-card-title">TARANACAK VARYASYONLAR</div>
+              <div class="sweep-pills" id="sweepPillsContainer" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                <span class="event-pill">1.5 mm</span>
+                <span class="event-pill">2.0 mm</span>
+                <span class="event-pill">2.5 mm</span>
+                <span class="event-pill">3.0 mm</span>
+              </div>
+            </div>
+
+            <button type="button" id="btnRunDesignStudy" class="btn run-btn" style="width:100%; margin-top:14px;">
+              <span class="btn-icon">📊</span> Tasarım Çalışmasını Başlat (Sweep)
+            </button>
+
+            <!-- Yükleme / İlerleme Durumu -->
+            <div id="studyStatusBox" style="display:none; margin-top:12px; padding:10px; border-radius:6px; background:rgba(2,132,199,0.15); border:1px solid #0284c7; color:#38bdf8; font-size:11px; text-align:center;">
+              ⏳ Tasarım varyasyonları paralel/sıralı simüle ediliyor...
+            </div>
+
+            <!-- Sonuçlar Matrisi -->
+            <div id="studyResultsContainer" style="display:none; margin-top:14px;">
+              <div class="recommendation-banner" id="studyRecBanner" style="background:linear-gradient(135deg, rgba(16,185,129,0.2), rgba(2,132,199,0.2)); border:1px solid #10b981; border-radius:6px; padding:10px; margin-bottom:12px;">
+                <div style="font-size:10px; font-weight:800; color:#34d399; letter-spacing:0.08em;">★ EN GÜVENLİ TASARIM ÖNERİSİ</div>
+                <div id="studyRecText" style="font-size:11px; color:#f1f5f9; margin-top:4px; font-weight:600;"></div>
+              </div>
+
+              <div class="subcard-header">KARŞILAŞTIRMALI MÜHENDİSLİK MATRİSİ</div>
+              <div class="table-responsive" style="overflow-x:auto; margin-top:8px;">
+                <table class="design-study-table" style="width:100%; border-collapse:collapse; font-size:10px;">
+                  <thead>
+                    <tr style="border-bottom:1px solid var(--border); color:var(--text-dim); text-align:left;">
+                      <th style="padding:6px 4px;">Tasarım</th>
+                      <th style="padding:6px 4px;">Risk</th>
+                      <th style="padding:6px 4px;">Pik T</th>
+                      <th style="padding:6px 4px;">Kaçak</th>
+                      <th style="padding:6px 4px; text-align:center;">İncele</th>
+                    </tr>
+                  </thead>
+                  <tbody id="studyTableBody">
+                    <!-- JS ile dinamik doldurulur -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. RESULTS & EVALUATION PANEL -->
+          <div class="props-section" id="panelResults" style="display:none;">
+            <div class="results-header-card">
+              <div class="risk-badge" id="riskBadge">BEKLENİYOR</div>
+              <div class="risk-score-text" id="riskScore">Risk: -- / 100</div>
+            </div>
+
+            <p class="results-summary-text" id="riskSummary">
+              Simülasyon henüz çalıştırılmadı. Sol ağaçtan ayarlarınızı kontrol edip <strong>Simülasyonu Başlat</strong> butonuna basınız.
+            </p>
+
+            <div id="confidenceBox" style="display:none;" class="confidence-alert"></div>
+
+            <div class="props-subcard">
+              <div class="subcard-header">MÜHENDİSLİK METRİKLERİ</div>
+              <div class="props-data-grid">
+                <div class="data-item">
+                  <span class="data-label">İlk Yayılım Süresi:</span>
+                  <span class="data-value" id="valPropTime">--</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Etkilenen Hücre:</span>
+                  <span class="data-value" id="valAffectedCells">--</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Maksimum Sıcaklık:</span>
+                  <span class="data-value" id="valPeakTemp">--</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Hash İmzası:</span>
+                  <span class="data-value mono" id="valHash">--</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="results-actions">
+              <button type="button" class="btn ghost-btn" id="btnSideOpenCharts" style="width:100%;">
+                📈 Sıcaklık Grafiğini Aç
+              </button>
+              <a id="btnSideDownloadReport" href="#" target="_blank" class="btn ghost-btn" style="width:100%; text-decoration:none; text-align:center; display:none;">
+                📄 UL 9540A Raporunu İndir
+              </a>
+            </div>
+          </div>
+
+          <!-- 8. CELL INSPECTOR PANEL (Seçili Hücre Özellikleri) -->
+          <div class="props-section" id="panelCellInspector" style="display:none;">
+            <div class="cell-inspector-header">
+              <div class="cell-icon-box" id="inspectCellIcon">🔋</div>
+              <div>
+                <h3 id="inspectCellName">Hücre #0</h3>
+                <span class="cell-status-tag" id="inspectCellStatus">NORMAL</span>
+              </div>
+            </div>
+
+            <div class="props-subcard">
+              <div class="subcard-header">ANLIK DURUM (t = <span id="inspectTimeSec">0.0</span> s)</div>
+              <div class="props-data-grid">
+                <div class="data-item">
+                  <span class="data-label">Sıcaklık:</span>
+                  <span class="data-value highlight" id="inspectCellTemp">25.0 °C</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Reaksiyon Oranı (α):</span>
+                  <span class="data-value" id="inspectCellAlpha">0.000</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Maksimum Sıcaklık:</span>
+                  <span class="data-value" id="inspectCellMaxTemp">-- °C</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Kaçak Zamanı:</span>
+                  <span class="data-value" id="inspectCellRunawayTime">-- s</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="props-subcard">
+              <div class="subcard-header">FİZİKSEL VE KONUM ÖZELLİKLERİ</div>
+              <div class="props-data-grid">
+                <div class="data-item">
+                  <span class="data-label">Koordinatlar (X, Y):</span>
+                  <span class="data-value" id="inspectCellCoords">X: 0 mm, Y: 0 mm</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Kütle:</span>
+                  <span class="data-value" id="inspectCellMass">45.0 g</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Format:</span>
+                  <span class="data-value" id="inspectCellFormat">18650</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Tetikleyici Hücre mi?:</span>
+                  <span class="data-value" id="inspectCellIsTrigger">HAYIR</span>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn trigger-pick-btn" id="btnSetAsTriggerCell">
+              ⚡ Bu Hücreyi Tetikleyici (Abuse) Olarak Belirle
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ================= TIMELINE & EVENTS BAR ================= -->
+  <section class="timeline-bar">
+    <div class="timeline-controls">
+      <button type="button" class="timeline-btn" id="btnTimelineReset" title="Başa Al">⏮</button>
+      <button type="button" class="timeline-btn play" id="btnTimelinePlay" title="Oynat / Duraklat">▶</button>
+      <span class="time-display">
+        <strong id="lblCurrentTime">0.00 s</strong> / <span id="lblTotalTime">90.00 s</span>
+      </span>
+
+      <div class="timeline-slider-wrapper">
+        <input type="range" id="timeScrubber" min="0" max="100" value="0" step="1" disabled>
+        <div class="timeline-progress-track" id="timelineProgressTrack"></div>
+      </div>
+
+      <div class="speed-selector">
+        <span class="speed-label">Hız:</span>
+        <button type="button" class="speed-btn" data-speed="0.5">0.5x</button>
+        <button type="button" class="speed-btn active" data-speed="1">1x</button>
+        <button type="button" class="speed-btn" data-speed="2">2x</button>
+      </div>
+    </div>
+
+    <!-- Sequential Event Milestones -->
+    <div class="timeline-events-container" id="timelineEventsContainer">
+      <div class="event-ticker" id="eventTicker">
+        <span class="event-pill normal">🏁 t=0.0s Simülasyon Bekleniyor</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BOTTOM ENGINEERING KPI BAR ================= -->
+  <footer class="kpi-bar">
+    <div class="kpi-cell">
+      <span class="kpi-label">Pik Sıcaklık (Tmax)</span>
+      <strong class="kpi-val" id="kpiTmax">25.0 °C</strong>
+    </div>
+
+    <div class="kpi-cell">
+      <span class="kpi-label">Kaçağa Giren Hücre</span>
+      <strong class="kpi-val" id="kpiTriggeredCells">0 / 9</strong>
+    </div>
+
+    <div class="kpi-cell">
+      <span class="kpi-label">Yayılım Oranı</span>
+      <strong class="kpi-val" id="kpiPropagation">0.0 %</strong>
+    </div>
+
+    <div class="kpi-cell">
+      <span class="kpi-label">İlk Yayılma Süresi</span>
+      <strong class="kpi-val" id="kpiTriggerTime">—</strong>
+    </div>
+
+    <div class="kpi-cell kpi-risk">
+      <span class="kpi-label">UL 9540A Risk Skoru</span>
+      <strong class="kpi-val" id="kpiRiskScore">-- / 100</strong>
+    </div>
+  </footer>
+
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- 1. SICAKLIK EĞRİSİ GRAFİK MODALI -->
+<div id="chartModal" class="modal" style="display:none; z-index:300;">
+  <div class="modal-content chart-modal-content">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span class="modal-icon">📈</span>
+        <span>Zamana Bağlı Hücre Sıcaklık Eğrileri (SciPy LSODA Çözümü)</span>
+      </div>
+      <span class="modal-close" id="closeChartModal">&times;</span>
+    </div>
+    <div class="modal-body" style="height:440px;">
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- 2. KÜTÜPHANE YÖNETİCİSİ MODALI -->
+<div id="libManagerModal" class="modal" style="display:none; z-index:400;">
+  <div class="modal-content lib-modal-content">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span class="modal-icon">📚</span>
+        <span>Özel Kütüphane Yöneticisi</span>
+      </div>
+      <span class="modal-close" id="closeLibManagerModal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Yerleşik literatür kütüphanelerini ve eklediğiniz özel kimyaları, bariyer malzemelerini ve formatları yönetin.</p>
+      
+      <div class="lib-tabs">
+        <button type="button" id="tabBtnChems" class="lib-tab-btn active">🧪 Hücre Kimyaları</button>
+        <button type="button" id="tabBtnMats" class="lib-tab-btn">🛡️ Termal Bariyerler</button>
+        <button type="button" id="tabBtnFormats" class="lib-tab-btn">🔋 Hücre Formatları</button>
+      </div>
+
+      <!-- Kimyalar -->
+      <div id="tabContentChems" class="lib-tab-content">
+        <div class="tab-action-row">
+          <span>Kinetik Arrhenius Modelleri:</span>
+          <button type="button" id="btnLibAddChem" class="btn ghost-btn micro-btn">+ Yeni Kimya Ekle</button>
+        </div>
+        <div id="libChemsList" class="lib-items-list"></div>
+      </div>
+
+      <!-- Malzemeler -->
+      <div id="tabContentMats" class="lib-tab-content" style="display:none;">
+        <div class="tab-action-row">
+          <span>Termal Bariyer ve Dolgu Malzemeleri:</span>
+          <button type="button" id="btnLibAddMat" class="btn ghost-btn micro-btn">+ Yeni Malzeme Ekle</button>
+        </div>
+        <div id="libMatsList" class="lib-items-list"></div>
+      </div>
+
+      <!-- Formatlar -->
+      <div id="tabContentFormats" class="lib-tab-content" style="display:none;">
+        <div class="tab-action-row">
+          <span>Hücre Formatları (Silindirik / Prizmatik):</span>
+          <button type="button" id="btnLibAddFormat" class="btn ghost-btn micro-btn">+ Yeni Format Ekle</button>
+        </div>
+        <div id="libFormatsList" class="lib-items-list"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="btnCloseLibManagerBottom" class="btn ghost-btn">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3. ÖZEL KİMYA MODALI (z-index: 500) -->
+<div id="customChemModal" class="modal" style="display:none; z-index:500;">
+  <div class="modal-content sub-modal-content">
+    <div class="modal-header">
+      <div class="modal-title"><span>🧪</span> Yeni Özel Kimya Tanımla</div>
+      <span class="modal-close" id="closeCustomChemModal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Literatür veya ARC testlerinizden elde edilen kinetik Arrhenius parametrelerini girin.</p>
+      <form id="formCustomChem">
+        <div class="field-group">
+          <label>Kimya Adı:</label>
+          <input type="text" id="cc_name" placeholder="Örn: NMC622 Gelişmiş" required>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Frekans Çarpanı (A, 1/s):</label>
+            <input type="number" step="any" id="cc_A" value="2.5e12" required>
+          </div>
+          <div class="field-group">
+            <label>Aktivasyon Enerjisi (J/mol):</label>
+            <input type="number" step="any" id="cc_Ea" value="128500" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Reaksiyon Entalpisi (J/g):</label>
+            <input type="number" step="any" id="cc_dH" value="780" required>
+          </div>
+          <div class="field-group">
+            <label>Aktif Madde Oranı (0-1):</label>
+            <input type="number" step="0.01" id="cc_ratio" value="0.58" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Kaçak Başlangıç T_onset (°C):</label>
+            <input type="number" step="1" id="cc_Tonset" value="155" required>
+          </div>
+          <div class="field-group">
+            <label>Tetikleme T_trigger (°C):</label>
+            <input type="number" step="1" id="cc_Ttrigger" value="210" required>
+          </div>
+        </div>
+        <p id="cc_warning" style="color:#f59e0b; font-size:0.82em; display:none; margin:8px 0;"></p>
+        <button type="submit" class="btn run-btn" style="width:100%; margin-top:12px;">Kaydet ve Kütüphaneye Ekle</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 4. ÖZEL FORMAT MODALI (z-index: 500) -->
+<div id="customFormatModal" class="modal" style="display:none; z-index:500;">
+  <div class="modal-content sub-modal-content">
+    <div class="modal-header">
+      <div class="modal-title"><span>🔋</span> Yeni Özel Hücre Formatı</div>
+      <span class="modal-close" id="closeCustomFormatModal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <form id="formCustomFormat">
+        <div class="field-group">
+          <label>Format Adı:</label>
+          <input type="text" id="cf_name" placeholder="Örn: 46950" required>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Yarıçap (mm):</label>
+            <input type="number" step="any" id="cf_r" placeholder="23" required>
+          </div>
+          <div class="field-group">
+            <label>Yükseklik (mm):</label>
+            <input type="number" step="any" id="cf_h" placeholder="95" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Toplam Kütle (kg):</label>
+            <input type="number" step="any" id="cf_mass" placeholder="0.42" required>
+          </div>
+          <div class="field-group">
+            <label>Kasa Kalınlığı (mm):</label>
+            <input type="number" step="any" id="cf_t" value="0.3" required>
+          </div>
+        </div>
+        <button type="submit" class="btn run-btn" style="width:100%; margin-top:12px;">Kaydet ve Kütüphaneye Ekle</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 5. ÖZEL MALZEME MODALI (z-index: 500) -->
+<div id="customMatModal" class="modal" style="display:none; z-index:500;">
+  <div class="modal-content sub-modal-content">
+    <div class="modal-header">
+      <div class="modal-title"><span>🛡️</span> Yeni Termal Bariyer Tanımla</div>
+      <span class="modal-close" id="closeCustomMatModal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <form id="formCustomMat">
+        <div class="field-group">
+          <label>Malzeme Adı:</label>
+          <input type="text" id="cm_name" placeholder="Örn: Aerojel Kompozit" required>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Isıl İletkenlik k (W/mK):</label>
+            <input type="number" step="any" id="cm_k" placeholder="Örn: 0.022" required>
+          </div>
+          <div class="field-group">
+            <label>Yoğunluk ρ (kg/m³):</label>
+            <input type="number" step="any" id="cm_rho" placeholder="Örn: 180" required>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Özgül Isı Cp (J/kgK):</label>
+          <input type="number" step="any" id="cm_cp" value="1000" required>
+        </div>
+        <button type="submit" class="btn run-btn" style="width:100%; margin-top:12px;">Kaydet ve Kütüphaneye Ekle</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
