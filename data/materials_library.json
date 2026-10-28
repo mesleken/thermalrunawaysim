@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "updated_at": "2026-09-13",
-  "description": "Pil Paketi Termal Kaçak Simülatörü için hücreler arası separatör, dolgu ve yapısal malzeme kütüphanesi.",
+  "version": "2.0.0",
+  "updated_at": "2026-10-28",
+  "description": "Pil Paketi Termal Kaçak Simülatörü için hücreler arası separatör, PCM, dolgu ve yapısal malzeme kütüphanesi.",
   "materials": [
     {
       "material_id": "air_gap",
@@ -11,6 +11,7 @@
       "density_kg_per_m3": 1.2,
       "cp_J_per_kg_K": 1005.0,
       "emissivity": 0.90,
+      "max_service_temp_C": 1200.0,
       "description": "Hücreler arasında hiçbir katı separatör bulunmadığı durumdaki doğal hava boşluğu iletim katsayısı."
     },
     {
@@ -54,6 +55,7 @@
       "density_kg_per_m3": 2700.0,
       "cp_J_per_kg_K": 896.0,
       "emissivity": 0.25,
+      "max_service_temp_C": 580.0,
       "description": "Hücre modül taşıyıcı çerçevesi ve alt soğutma plakası metal malzemesi."
     },
     {
@@ -64,7 +66,44 @@
       "density_kg_per_m3": 650.0,
       "cp_J_per_kg_K": 1300.0,
       "emissivity": 0.85,
+      "max_service_temp_C": 220.0,
       "description": "Hücreler arası yapısal rijitleştirme ve geciktirici yangın bariyeri dolgusu."
+    },
+    {
+      "material_id": "paraffin_pcm_pad",
+      "name": "Faz Değiştiren Parafin/Grafit Mat (PCM Buffer)",
+      "type": "separator",
+      "k_thermal_W_per_m_K": 1.20,
+      "density_kg_per_m3": 920.0,
+      "cp_J_per_kg_K": 2100.0,
+      "emissivity": 0.88,
+      "max_service_temp_C": 350.0,
+      "latent_heat_J_per_kg": 185000.0,
+      "melting_temp_C": 52.0,
+      "melting_range_K": 6.0,
+      "description": "52°C erime noktasında 185 kJ/kg gizli ısı yutarak komşu hücrenin ısınmasını tamponlayan PCM matı."
+    },
+    {
+      "material_id": "ceramic_intumescent_mat",
+      "name": "Şişen Seramik Elyaf Bariyer (Intumescent Mat)",
+      "type": "separator",
+      "k_thermal_W_per_m_K": 0.035,
+      "density_kg_per_m3": 280.0,
+      "cp_J_per_kg_K": 1050.0,
+      "emissivity": 0.82,
+      "max_service_temp_C": 1200.0,
+      "description": "Isı karşısında genleşerek hücreler arası alev ve sıcak gaz geçişini bloke eden endüstriyel seramik bariyer."
+    },
+    {
+      "material_id": "pouch_laminate_al",
+      "name": "Alüminyum Polimer Kese Kılıfı (Pouch Laminate)",
+      "type": "structural",
+      "k_thermal_W_per_m_K": 85.0,
+      "density_kg_per_m3": 2200.0,
+      "cp_J_per_kg_K": 950.0,
+      "emissivity": 0.35,
+      "max_service_temp_C": 250.0,
+      "description": "Pouch hücre dış koruyucu bariyer katmanı."
     }
   ]
 }

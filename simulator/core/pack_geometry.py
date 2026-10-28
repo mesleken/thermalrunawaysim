@@ -22,7 +22,8 @@ class NeighborConnection:
         contact_area_m2: float,
         separator_material_id: Optional[str] = None,
         separator_thickness_m: float = 0.0,
-        gap_material_id: str = "air_gap"
+        gap_material_id: str = "air_gap",
+        interface_axis: str = "radial"  # "x", "y" veya "radial"
     ):
         self.cell_i_id = cell_i_id
         self.cell_j_id = cell_j_id
@@ -32,6 +33,7 @@ class NeighborConnection:
         self.separator_material_id = separator_material_id
         self.separator_thickness_m = separator_thickness_m
         self.gap_material_id = gap_material_id
+        self.interface_axis = interface_axis
 
 
 class PackGeometryBuilder:
@@ -43,7 +45,8 @@ class PackGeometryBuilder:
             "18650": {"radius": 0.009, "height": 0.065, "mass": 0.046, "cp": 1050.0, "casing_thickness": 0.0003, "type": "cylindrical"},
             "21700": {"radius": 0.0105, "height": 0.070, "mass": 0.068, "cp": 1020.0, "casing_thickness": 0.0003, "type": "cylindrical"},
             "4680": {"radius": 0.023, "height": 0.080, "mass": 0.355, "cp": 1100.0, "casing_thickness": 0.0006, "type": "cylindrical"},
-            "Prismatic_50Ah": {"width": 0.148, "thickness": 0.026, "height": 0.095, "mass": 1.15, "cp": 1150.0, "casing_thickness": 0.001, "type": "prismatic"}
+            "Prismatic_50Ah": {"width": 0.148, "thickness": 0.026, "height": 0.095, "mass": 1.15, "cp": 1150.0, "casing_thickness": 0.001, "type": "prismatic"},
+            "Pouch_60Ah": {"width": 0.220, "thickness": 0.011, "height": 0.105, "mass": 0.86, "cp": 1180.0, "casing_thickness": 0.00015, "type": "pouch"}
         }
         
         base_dir = Path(__file__).resolve().parent.parent.parent
@@ -104,12 +107,15 @@ class PackGeometryBuilder:
         format_lookup_key = cell_format
         if cell_format in ["prismatic", CellFormat.PRISMATIC]:
             format_lookup_key = "Prismatic_50Ah"
+        elif cell_format in ["pouch", CellFormat.POUCH]:
+            format_lookup_key = "Pouch_60Ah"
             
         specs = self.CELL_DIMENSIONS.get(format_lookup_key, self.CELL_DIMENSIONS["18650"])
         sample_geom = CellGeometry(cell_format, specs=specs)
-        
+        is_planar = sample_geom.geometry_type in ("prismatic", "pouch")
+
         dx_cell = sample_geom.length
-        dy_cell = sample_geom.thickness if specs.get("type") == "prismatic" else sample_geom.diameter
+        dy_cell = sample_geom.thickness if is_planar else sample_geom.diameter
         cell_height = sample_geom.height
 
         mass = cell_mass_kg or specs.get("mass", 0.046)
@@ -118,9 +124,11 @@ class PackGeometryBuilder:
         cells: List[CellModel] = []
         cell_id = 0
 
-        # Adım aralıkları (merkezden merkeze)
-        pitch_x = dx_cell + spacing_x_m
-        pitch_y = dy_cell + spacing_y_m
+        # Adım aralıkları (merkezden merkeze, bariyer kalınlığı boşluktan büyükse fiziksel genişleme)
+        effective_spacing_x = max(spacing_x_m, sep_thickness_m)
+        effective_spacing_y = max(spacing_y_m, sep_thickness_m)
+        pitch_x = dx_cell + effective_spacing_x
+        pitch_y = dy_cell + effective_spacing_y
 
         for r in range(rows):
             # Staggered (üçgen/heksagonal) dizilim varsa tek sayılı satırları yarı adım kaydır
@@ -179,19 +187,22 @@ class PackGeometryBuilder:
                     continue
 
                 # Yüzeyden yüzeye boşluk ve temas alanı hesapla
-                if cell_format == CellFormat.PRISMATIC:
+                if ci.geometry.geometry_type in ("prismatic", "pouch"):
                     if dx > dy:
-                        # X yönü komşusu — geniş yüz temas
+                        # X yönü komşusu (dar yan yüz temas)
                         surf_gap = max(1e-4, dx - dx_cell)
                         contact_area = ci.geometry.height * ci.geometry.thickness
+                        axis = "x"
                     else:
-                        # Y yönü komşusu — dar yan yüz temas
+                        # Y yönü komşusu (geniş ana yüz temas)
                         surf_gap = max(1e-4, dy - dy_cell)
                         contact_area = ci.geometry.height * ci.geometry.length
+                        axis = "y"
                 else:
                     surf_gap = max(1e-4, dist - dx_cell)
                     # Silindirik hücreler için etkin iletim alanı
                     contact_area = cell_height * (dx_cell * 0.65)
+                    axis = "radial"
 
                 conn = NeighborConnection(
                     cell_i_id=ci.cell_id,
@@ -201,7 +212,8 @@ class PackGeometryBuilder:
                     contact_area_m2=contact_area,
                     separator_material_id=separator_material_id,
                     separator_thickness_m=sep_thickness_m,
-                    gap_material_id=gap_material_id
+                    gap_material_id=gap_material_id,
+                    interface_axis=axis
                 )
                 connections.append(conn)
 

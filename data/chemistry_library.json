@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "updated_at": "2026-09-13",
-  "description": "Pil Paketi Termal Kaçak Simülatörü V1.0 için literatür bazlı lityum-iyon hücre kinetik parametre kütüphanesi.",
+  "version": "2.0.0",
+  "updated_at": "2026-10-28",
+  "description": "Pil Paketi Termal Kaçak Simülatörü V2.0 için literatür bazlı lityum-iyon ve sodyum-iyon hücre kinetik, elektrik ve gaz parametre kütüphanesi.",
   "validation_status": "literature_calibrated",
   "chemistries": [
     {
@@ -10,6 +10,15 @@
       "cell_format_default": "18650",
       "nominal_voltage_V": 3.7,
       "nominal_capacity_Ah": 2.6,
+      "internal_resistance_ohm": 0.022,
+      "gas_yield_L_per_Ah": 1.75,
+      "gas_fractions": {
+        "CO2": 0.38,
+        "CO": 0.28,
+        "H2": 0.22,
+        "CH4": 0.07,
+        "C2H4": 0.05
+      },
       "nominal_mass_kg": 0.046,
       "nominal_cp_J_per_kg_K": 1050.0,
       "T_ambient_default_K": 298.15,
@@ -45,6 +54,15 @@
       "cell_format_default": "21700",
       "nominal_voltage_V": 3.7,
       "nominal_capacity_Ah": 4.8,
+      "internal_resistance_ohm": 0.018,
+      "gas_yield_L_per_Ah": 2.25,
+      "gas_fractions": {
+        "CO2": 0.32,
+        "CO": 0.33,
+        "H2": 0.24,
+        "CH4": 0.06,
+        "C2H4": 0.05
+      },
       "nominal_mass_kg": 0.068,
       "nominal_cp_J_per_kg_K": 1020.0,
       "T_ambient_default_K": 298.15,
@@ -78,6 +96,15 @@
       "cell_format_default": "prismatic",
       "nominal_voltage_V": 3.2,
       "nominal_capacity_Ah": 50.0,
+      "internal_resistance_ohm": 0.0006,
+      "gas_yield_L_per_Ah": 0.85,
+      "gas_fractions": {
+        "CO2": 0.46,
+        "H2": 0.32,
+        "CO": 0.14,
+        "CH4": 0.05,
+        "C2H4": 0.03
+      },
       "nominal_mass_kg": 1.15,
       "nominal_cp_J_per_kg_K": 1150.0,
       "T_ambient_default_K": 298.15,
@@ -105,6 +132,129 @@
         "Wang, Q., et al. (2019). A review on lithium-ion battery thermal safety. Journal of Power Sources, 438, 226998."
       ],
       "notes": "Olivin kristal kafesindeki güçlü P-O kovalent bağı sebebiyle yüksek termal kararlılık, yüksek onset ve düşük entalpi."
+    },
+    {
+      "chemistry_id": "LMFP_high_safety_v1",
+      "name": "LMFP (Lityum Mangan Demir Fosfat / Gelişmiş Voltaj)",
+      "cell_format_default": "pouch",
+      "nominal_voltage_V": 3.75,
+      "nominal_capacity_Ah": 60.0,
+      "internal_resistance_ohm": 0.0008,
+      "gas_yield_L_per_Ah": 1.05,
+      "gas_fractions": {
+        "CO2": 0.44,
+        "H2": 0.28,
+        "CO": 0.18,
+        "CH4": 0.06,
+        "C2H4": 0.04
+      },
+      "nominal_mass_kg": 0.86,
+      "nominal_cp_J_per_kg_K": 1180.0,
+      "T_ambient_default_K": 298.15,
+      "T_onset_C": 195.0,
+      "T_onset_K": 468.15,
+      "T_trigger_C": 240.0,
+      "T_trigger_K": 513.15,
+      "T_max_estimated_C": 520.0,
+      "A_pre_exponential_per_s": 8.0e13,
+      "Ea_kJ_per_mol": 155.0,
+      "Ea_J_per_mol": 155000.0,
+      "delta_H_J_per_g": 440.0,
+      "delta_H_J_per_kg": 440000.0,
+      "n_reaction_order": 1.0,
+      "active_mass_ratio": 0.54,
+      "uncertainty": {
+        "A_factor_range": [0.5, 2.0],
+        "Ea_percent": 7.0,
+        "delta_H_percent": 12.0,
+        "T_onset_delta_C": 10.0
+      },
+      "source_references": [
+        "Li, Y., et al. (2023). Thermal stability and safety characteristics of LiMnxFe1-xPO4 cathode materials. Journal of Energy Chemistry, 78, 112-124."
+      ],
+      "notes": "LFP'ye göre daha yüksek enerji yoğunluğu ve gerilim sağlarken yüksek termal kaçak eşiğini korur."
+    },
+    {
+      "chemistry_id": "NCA_high_power_v1",
+      "name": "NCA (Nikel Kobalt Alüminyum / Ultra Yüksek Güç)",
+      "cell_format_default": "21700",
+      "nominal_voltage_V": 3.65,
+      "nominal_capacity_Ah": 4.9,
+      "internal_resistance_ohm": 0.015,
+      "gas_yield_L_per_Ah": 2.40,
+      "gas_fractions": {
+        "CO": 0.35,
+        "CO2": 0.30,
+        "H2": 0.25,
+        "CH4": 0.06,
+        "C2H4": 0.04
+      },
+      "nominal_mass_kg": 0.069,
+      "nominal_cp_J_per_kg_K": 1010.0,
+      "T_ambient_default_K": 298.15,
+      "T_onset_C": 132.0,
+      "T_onset_K": 405.15,
+      "T_trigger_C": 185.0,
+      "T_trigger_K": 458.15,
+      "T_max_estimated_C": 980.0,
+      "A_pre_exponential_per_s": 7.5e12,
+      "Ea_kJ_per_mol": 114.0,
+      "Ea_J_per_mol": 114000.0,
+      "delta_H_J_per_g": 960.0,
+      "delta_H_J_per_kg": 960000.0,
+      "n_reaction_order": 1.0,
+      "active_mass_ratio": 0.63,
+      "uncertainty": {
+        "A_factor_range": [0.6, 1.8],
+        "Ea_percent": 6.5,
+        "delta_H_percent": 15.0,
+        "T_onset_delta_C": 8.0
+      },
+      "source_references": [
+        "Barker, J., et al. (2019). Comprehensive analysis of thermal runaway in NCA cells. J. Power Sources, 412, 452-461."
+      ],
+      "notes": "Yüksek deşarj kapasiteli elektrikli araç hücresi; düşük onset sıcaklığı ve şiddetli ekzotermik reaksiyon."
+    },
+    {
+      "chemistry_id": "NaIon_layered_v1",
+      "name": "Na-İyon (Sodyum İyon Katmanlı Oksit NFPP/NVP)",
+      "cell_format_default": "18650",
+      "nominal_voltage_V": 3.1,
+      "nominal_capacity_Ah": 1.8,
+      "internal_resistance_ohm": 0.025,
+      "gas_yield_L_per_Ah": 1.10,
+      "gas_fractions": {
+        "CO2": 0.42,
+        "CO": 0.24,
+        "H2": 0.24,
+        "CH4": 0.06,
+        "C2H4": 0.04
+      },
+      "nominal_mass_kg": 0.048,
+      "nominal_cp_J_per_kg_K": 1080.0,
+      "T_ambient_default_K": 298.15,
+      "T_onset_C": 180.0,
+      "T_onset_K": 453.15,
+      "T_trigger_C": 230.0,
+      "T_trigger_K": 503.15,
+      "T_max_estimated_C": 580.0,
+      "A_pre_exponential_per_s": 3.2e13,
+      "Ea_kJ_per_mol": 140.0,
+      "Ea_J_per_mol": 140000.0,
+      "delta_H_J_per_g": 490.0,
+      "delta_H_J_per_kg": 490000.0,
+      "n_reaction_order": 1.0,
+      "active_mass_ratio": 0.55,
+      "uncertainty": {
+        "A_factor_range": [0.5, 2.0],
+        "Ea_percent": 8.0,
+        "delta_H_percent": 15.0,
+        "T_onset_delta_C": 10.0
+      },
+      "source_references": [
+        "Zhao, C., et al. (2022). Thermal safety characteristics of sodium-ion battery compared with lithium-ion. Energy Storage Materials, 51, 882-891."
+      ],
+      "notes": "Düşük maliyetli alternatif; lityum nikelli hücrelere göre daha yüksek termal kararlılık ve daha az alev gazı üretir."
     }
   ]
 }

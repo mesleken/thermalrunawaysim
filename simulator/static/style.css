@@ -514,15 +514,15 @@ html, body {
 
 .temperature-legend {
   position: absolute;
-  bottom: 14px;
+  bottom: 48px;
   right: 14px;
-  width: 250px;
-  background: rgba(14, 18, 23, 0.85);
+  width: 255px;
+  background: rgba(14, 18, 23, 0.88);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
   backdrop-filter: blur(8px);
-  z-index: 10;
+  z-index: 15;
 }
 
 .legend-header {
@@ -1296,5 +1296,350 @@ select:focus {
 #advPhysicsFields.active {
   opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+/* ================= 5-TAB DOCKED ANALYTICS DRAWER ================= */
+.analytics-drawer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(14, 18, 23, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  z-index: 25;
+  transition: height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 38px; /* Collapsed */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.analytics-drawer.expanded {
+  height: 230px; /* Expanded */
+}
+
+.drawer-header {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.drawer-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.drawer-tab:hover {
+  color: var(--text-main);
+  background: var(--bg-hover);
+}
+
+.drawer-tab.active {
+  color: var(--accent-cyan);
+  background: rgba(2, 132, 199, 0.15);
+  border-color: rgba(2, 132, 199, 0.4);
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drawer-time-tag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+  background: var(--bg-input);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 8px 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.drawer-body canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ================= PRİZMATİK VE POUCH 3D HÜCRE STİLLERİ ================= */
+.cell-3d.prismatic {
+  border-radius: 6px;
+  width: 58px;
+  height: 76px;
+  box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45), 0 6px 14px rgba(0, 0, 0, 0.55);
+  background: linear-gradient(155deg, #1d4ed8 0%, #1e40af 55%, #1e3a8a 100%);
+}
+
+.cell-3d.prismatic .cell-cap {
+  width: 34px;
+  height: 6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e2e8f0 0 28%, #475569 28% 72%, #f59e0b 72% 100%);
+}
+
+.cell-3d.pouch {
+  border-radius: 3px;
+  width: 58px;
+  height: 68px;
+  box-shadow: inset 0 0 0 1.5px #64748b, 0 4px 12px rgba(0,0,0,0.5);
+  background: linear-gradient(180deg, #64748b 0%, #334155 55%, #1e293b 100%);
+}
+
+.cell-3d.pouch .cell-cap {
+  display: none;
+}
+
+.cell-3d.pouch::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 10px;
+  width: 11px;
+  height: 5px;
+  background: #cbd5e1;
+  border-radius: 2px 2px 0 0;
+  box-shadow: 25px 0 0 #f59e0b;
+}
+
+/* Dinamik Termal Durumların Prizmatik ve Pouch Hücrelerde Baskın Olması */
+.cell-3d.prismatic.warming,
+.cell-3d.pouch.warming {
+  background: linear-gradient(135deg, #b45309, #f59e0b 50%, #d97706);
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.35);
+}
+
+.cell-3d.prismatic.onset,
+.cell-3d.pouch.onset {
+  background: linear-gradient(135deg, #c2410c, #ea580c 50%, #9a3412);
+  box-shadow: 0 10px 22px rgba(234, 88, 12, 0.45);
+}
+
+.cell-3d.prismatic.runaway,
+.cell-3d.pouch.runaway {
+  background: linear-gradient(135deg, #b91c1c, #ef4444 50%, #7f1d1d);
+  box-shadow: 0 0 35px var(--danger-glow);
+}
+
+.cell-3d.prismatic.burned,
+.cell-3d.pouch.burned {
+  background: linear-gradient(135deg, #334155, #475569 50%, #1e293b);
+  border-color: #64748b;
+  opacity: 0.85;
+}
+
+/* ================= 2D HOVER TOOLTIP & SSE PROGRESS & REGÜLASYON STİLLERİ ================= */
+.canvas-hover-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(11, 15, 23, 0.94);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 10px;
+  color: #f1f5f9;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
+  z-index: 30;
+  min-width: 150px;
+  line-height: 1.45;
+}
+
+.sse-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.sse-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #38bdf8, #34d399);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+.sub-rxn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.sub-rxn-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 9px;
+  padding: 4px 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sub-rxn-table td {
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sub-rxn-table input {
+  padding: 3px 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.reg-compliance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.reg-compliance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.reg-std-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.reg-std-desc {
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+.reg-badge-pass,
+.reg-badge-fail,
+.reg-badge-warn,
+.reg-badge-neutral {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.reg-badge-pass {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.reg-badge-fail {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.reg-badge-warn {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.reg-badge-neutral {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.heatmap-2d-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  font-size: 10px;
+}
+
+.heatmap-2d-table th {
+  font-size: 9px;
+  color: var(--text-muted);
+  padding: 4px;
+  text-align: center;
+}
+
+.heatmap-2d-cell {
+  padding: 7px 5px;
+  border-radius: 5px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.heatmap-2d-cell:hover {
+  transform: scale(1.04);
+  border-color: #ffffff;
+}
+
+/* ================= RUN A/B KIYASLAMA VE PROJELER ================= */
+.compare-metric-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.compare-metric-card .title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.compare-metric-card .delta {
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.project-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  transition: all 0.15s ease;
+}
+
+.project-item-row:hover {
+  border-color: var(--accent);
 }
 

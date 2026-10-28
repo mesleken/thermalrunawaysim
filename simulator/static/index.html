@@ -28,12 +28,30 @@
     </div>
 
     <div class="top-actions">
+      <select id="selectPreset" class="btn ghost-btn" style="padding:4px 8px; font-size:11px; max-width:225px; cursor:pointer;" title="Endüstriyel Hazır Şablon Yükle">
+        <option value="">⚡ Hazır Şablonlar (6 Endüstriyel)...</option>
+        <option value="tesla_model3_cylindrical">Tesla Model 3/Y (21700 NMC811)</option>
+        <option value="byd_blade_prismatic_lfp">BYD Blade (LFP Prizmatik ISC)</option>
+        <option value="ctc_4680_structural_pack">4680 Yapısal Paket (CTC NCA)</option>
+        <option value="vw_meb_pouch_nmc">VW MEB (Pouch NMC Kese)</option>
+        <option value="ess_naion_pcm_rack">ESS Sodyum-İyon (PCM Tamponlu)</option>
+        <option value="single_cell_arc_un383">Tek Hücre ARC / UN 38.3 (%30 SOC)</option>
+      </select>
+
+      <button type="button" class="btn ghost-btn" id="btnOpenProjectsModal" title="Kayıtlı Projeler">
+        <span>📁</span> Projeler
+      </button>
+
+      <button type="button" class="btn ghost-btn" id="btnOpenCompareModal" title="İki Simülasyonu Karşılaştır">
+        <span>⚖️</span> Run A/B Kıyasla
+      </button>
+
       <button type="button" class="btn ghost-btn" id="btnOpenLibManager">
         <span>📚</span> Kütüphane Yöneticisi
       </button>
 
       <button type="button" class="btn ghost-btn" id="btnOpenChartsModal">
-        <span>📈</span> Sıcaklık Grafiği
+        <span>📈</span> Grafikler
       </button>
 
       <a id="btnDownloadReport" href="#" target="_blank" class="btn ghost-btn download-btn" style="display:none;">
@@ -114,6 +132,12 @@
             <span class="tree-status status-ready" title="Hazır">✓</span>
           </div>
 
+          <div class="tree-item" data-panel="validation" id="treeItemValidation">
+            <span class="tree-icon">📈</span>
+            <span class="tree-label">Validasyon & Kanıt Motoru</span>
+            <span class="tree-status" id="statusValidationBadge" title="Kalibrasyon Bekleniyor">○</span>
+          </div>
+
           <div class="tree-item" data-panel="results" id="treeItemResults">
             <span class="tree-icon">▤</span>
             <span class="tree-label">Sonuçlar & Rapor</span>
@@ -164,8 +188,9 @@
       </div>
 
       <!-- 2D Canvas Visualizer -->
-      <div id="battery2DViewer" class="battery-2d-workspace" style="display:none;">
+      <div id="battery2DViewer" class="battery-2d-workspace" style="display:none; position:relative;">
         <canvas id="packCanvas" width="700" height="420"></canvas>
+        <div id="canvasHoverTooltip" class="canvas-hover-tooltip" style="display:none;"></div>
       </div>
 
       <!-- Quick Hint Overlay -->
@@ -182,10 +207,30 @@
         <div class="gradient-bar"></div>
         <div class="legend-ticks">
           <span>25°C</span>
-          <span>60°C</span>
-          <span>155°C (Onset)</span>
-          <span>210°C (TR)</span>
+          <span id="legendTickWarming">60°C</span>
+          <span id="legendTickOnset">155°C (Onset)</span>
+          <span id="legendTickTr">210°C (TR)</span>
           <span>800°C+</span>
+        </div>
+      </div>
+
+      <!-- Docked Bottom Analytics Chart Drawer (5-Tab) -->
+      <div id="analyticsDrawer" class="analytics-drawer">
+        <div class="drawer-header">
+          <div class="drawer-tabs">
+            <button type="button" class="drawer-tab active" data-chart="temp">🌡️ Sıcaklık (T)</button>
+            <button type="button" class="drawer-tab" data-chart="rate">⚡ Hız (dT/dt)</button>
+            <button type="button" class="drawer-tab" data-chart="flux">🔥 Isı Akıları (Q)</button>
+            <button type="button" class="drawer-tab" data-chart="kinetics">⚛️ 4-Kademe (α)</button>
+            <button type="button" class="drawer-tab" data-chart="gas">💨 Gaz & Basınç</button>
+          </div>
+          <div class="drawer-actions">
+            <span id="drawerTimeCursor" class="drawer-time-tag">t = 0.0 s</span>
+            <button type="button" id="btnToggleDrawer" class="btn ghost-btn micro-btn" title="Genişlet / Küçült">▲ Genişlet</button>
+          </div>
+        </div>
+        <div class="drawer-body" id="drawerBody">
+          <canvas id="drawerChart"></canvas>
         </div>
       </div>
     </section>
@@ -213,6 +258,7 @@
                   <option value="21700">21700 Silindirik (21x70 mm)</option>
                   <option value="4680">4680 Silindirik (46x80 mm)</option>
                   <option value="prismatic">Prizmatik LFP (148x98x27 mm)</option>
+                  <option value="pouch">Pouch / Kese (60Ah, 300x100x12 mm)</option>
                 </select>
                 <button type="button" id="btnAddCustomFormat" class="btn-micro" title="Yeni Özel Format Ekle">+</button>
               </div>
@@ -314,27 +360,69 @@
 
             <div id="advPhysicsFields" style="opacity:0.4; pointer-events:none; transition:opacity 0.2s ease;">
               <div class="props-subcard" style="margin-top:8px;">
-                <div class="subcard-header">1. KİNETİK ARRHENIUS DEĞERLERİ</div>
-                <div class="field-row">
-                  <div class="field-group">
-                    <label for="inputAdvA">Frekans Çarpanı A (1/s):</label>
-                    <input type="number" step="any" id="inputAdvA" name="custom_A_pre_exponential" placeholder="2.5e12">
+                <div class="subcard-header">1. HESAPLAMALI FİZİK MODELİ (AŞAMA 1)</div>
+                <div class="field-group">
+                  <label for="selectNodalModel">Düğümsel Isı Modeli (Nodal Resolution):</label>
+                  <select id="selectNodalModel" name="nodal_model">
+                    <option value="lumped" selected>Toplu Isıl Kapasite (Lumped - 1 Düğüm/Hücre)</option>
+                    <option value="core_shell">Core-Shell 1D Radyal (2 Düğüm: Jöle Rulo + Kovan)</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="selectKineticsModel">Kinetik Çözüm Motoru:</label>
+                  <select id="selectKineticsModel" name="kinetics_model">
+                    <option value="single_step" selected>Tek Adımlı Arrhenius (Klasik)</option>
+                    <option value="multi_reaction">Çoklu-Reaksiyon Kinetiği (4 Kademe: SEI, Anot, Separatör, Katot)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="props-subcard" style="margin-top:10px;">
+                <div class="subcard-header">2. KİNETİK ARRHENIUS DEĞERLERİ</div>
+                <div id="singleStepKineticsFields">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="inputAdvA">Frekans Çarpanı A (1/s):</label>
+                      <input type="number" step="any" id="inputAdvA" name="custom_A_pre_exponential" placeholder="2.5e12">
+                    </div>
+                    <div class="field-group">
+                      <label for="inputAdvEa">Aktivasyon Ea (J/mol):</label>
+                      <input type="number" step="100" id="inputAdvEa" name="custom_Ea_J_per_mol" placeholder="128500">
+                    </div>
                   </div>
-                  <div class="field-group">
-                    <label for="inputAdvEa">Aktivasyon Ea (J/mol):</label>
-                    <input type="number" step="100" id="inputAdvEa" name="custom_Ea_J_per_mol" placeholder="128500">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="inputAdvDeltaH">Entalpi ΔH (J/g):</label>
+                      <input type="number" step="10" id="inputAdvDeltaH" name="custom_delta_H_J_per_g" placeholder="780">
+                    </div>
+                    <div class="field-group">
+                      <label for="inputAdvN">Reaksiyon Mertebesi n:</label>
+                      <input type="number" step="0.1" id="inputAdvN" name="custom_reaction_order_n" value="1.0" min="0.1" max="3.0">
+                    </div>
                   </div>
                 </div>
-                <div class="field-row">
-                  <div class="field-group">
-                    <label for="inputAdvDeltaH">Entalpi ΔH (J/g):</label>
-                    <input type="number" step="10" id="inputAdvDeltaH" name="custom_delta_H_J_per_g" placeholder="780">
+
+                <!-- 4-Kademeli Çoklu Reaksiyon Düzenleme Tablosu -->
+                <div id="multiReactionTableContainer" style="display:none; margin-bottom:10px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:10px; color:#38bdf8; font-weight:700;">4-KADEMELİ REAKSİYON PARAMETRELERİ</span>
+                    <button type="button" id="btnResetSubReactions" class="btn ghost-btn micro-btn" style="font-size:9px; padding:2px 6px;">Varsayılan</button>
                   </div>
-                  <div class="field-group">
-                    <label for="inputAdvN">Reaksiyon Mertebesi n:</label>
-                    <input type="number" step="0.1" id="inputAdvN" name="custom_reaction_order_n" value="1.0" min="0.1" max="3.0">
-                  </div>
+                  <table class="sub-rxn-table">
+                    <thead>
+                      <tr>
+                        <th>Kademe</th>
+                        <th>A (1/s)</th>
+                        <th>Ea (kJ/mol)</th>
+                        <th>ΔH (J/g)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="subReactionTableBody">
+                      <!-- JS ile seçili kimyanın 4 alt reaksiyonu doldurulur -->
+                    </tbody>
+                  </table>
                 </div>
+
                 <div class="field-group">
                   <label for="inputAdvRatio">Aktif Kütle Oranı (0 - 1):</label>
                   <input type="number" step="0.01" id="inputAdvRatio" name="custom_active_mass_ratio" placeholder="0.58" min="0.05" max="1.0">
@@ -342,7 +430,17 @@
               </div>
 
               <div class="props-subcard" style="margin-top:10px;">
-                <div class="subcard-header">2. EJECTA, GAZ VENTING & IŞINIM</div>
+                <div class="subcard-header">3. DİNAMİK KÜTLE KAYBI & YÖNLÜ VENTING</div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label for="inputAdvMassLoss">Venting Kütle Kaybı (%):</label>
+                    <input type="number" step="1" id="inputAdvMassLoss" name="ejecta_mass_loss_ratio" value="0" min="0" max="40" title="Patlama anında dışarı atılan gaz/eriyik kütle yüzdesi">
+                  </div>
+                  <div class="field-group">
+                    <label for="inputAdvVentDir">Yönlü Venting Açısı (°):</label>
+                    <input type="number" step="15" id="inputAdvVentDir" name="vent_direction_deg" placeholder="Oto (Tüm yönler)" min="0" max="360" title="Alev jetinin yönü (0-360 derece)">
+                  </div>
+                </div>
                 <div class="field-row">
                   <div class="field-group">
                     <label for="inputAdvHvent">h Venting (W/m²K):</label>
@@ -356,6 +454,24 @@
                 <div class="field-group">
                   <label for="inputAdvEmissivity">Yüzey Emisivitesi (ε):</label>
                   <input type="number" step="0.05" id="inputAdvEmissivity" name="surface_emissivity" value="0.85" min="0.1" max="1.0">
+                </div>
+              </div>
+
+              <div class="props-subcard" style="margin-top:10px;">
+                <div class="subcard-header">4. GAZ SALINIMI & MAHFAZA PATLAMA RİSKİ (NFPA 68)</div>
+                <div class="field-group">
+                  <label for="inputAdvFreeVol">Mahfaza Serbest Hacmi (Litre):</label>
+                  <input type="number" step="0.5" id="inputAdvFreeVol" name="enclosure_free_volume_liters" placeholder="Oto (Modül boşluk hacmi tahmini)" min="0.1">
+                </div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label for="inputAdvVentArea">Tahliye Valfi Alanı (cm²):</label>
+                    <input type="number" step="0.5" id="inputAdvVentArea" name="vent_valve_area_cm2" value="2.0" min="0.1">
+                  </div>
+                  <div class="field-group">
+                    <label for="inputAdvBurstPress">Valf Patlama Basıncı (kPa):</label>
+                    <input type="number" step="5" id="inputAdvBurstPress" name="vent_burst_pressure_kpa" value="35.0" min="1.0">
+                  </div>
                 </div>
               </div>
             </div>
@@ -426,7 +542,12 @@
 
           <!-- 5. EXCITATION PANEL -->
           <div class="props-section" id="panelExcitation" style="display:none;">
-            <p class="props-desc">Termal kaçağı tetikleyen abuse senaryosunu (harici ısıtıcı veya anlık onset) tanımlayın.</p>
+            <p class="props-desc">Termal kaçağı tetikleyen abuse senaryosunu (harici ısıtıcı, tırnak/çivi batması, fırın veya anlık onset) ve şarj seviyesini (SOC) belirleyin.</p>
+
+            <div class="field-group" style="margin-bottom:12px;">
+              <label for="inputSocPercent">Hücre Şarj Seviyesi (SOC %): <strong id="lblSocPercent" style="color:#38bdf8;">100%</strong></label>
+              <input type="range" id="inputSocPercent" name="soc_percent" min="0" max="100" value="100" step="5" style="width:100%;">
+            </div>
 
             <div class="field-row">
               <div class="field-group">
@@ -434,9 +555,12 @@
                 <input type="number" id="inputTriggerCell" name="trigger_cell_id" value="0" min="0">
               </div>
               <div class="field-group">
-                <label for="selectTriggerMethod">Tetikleme Türü:</label>
+                <label for="selectTriggerMethod">Tetikleme Türü (Abuse):</label>
                 <select id="selectTriggerMethod" name="trigger_method">
-                  <option value="thermal_pulse" selected>Harici Isı Darbesi</option>
+                  <option value="thermal_pulse" selected>Harici Termal Darbe (Pulse)</option>
+                  <option value="external_heater">UL 9540A Kovan Film Isıtıcı</option>
+                  <option value="nail_penetration_isc">SAE J2464 / GB Çivi & Kısa Devre (ISC)</option>
+                  <option value="oven_ramp">UN 38.3 Termal Fırın Rampası</option>
                   <option value="instant_onset">Anlık Başlangıç Sıcaklığı</option>
                 </select>
               </div>
@@ -456,6 +580,22 @@
             <div class="field-group" id="groupInstantOnset" style="display:none;">
               <label for="inputTriggerInitialTemp">Anlık Başlangıç Sıcaklığı (°C):</label>
               <input type="number" id="inputTriggerInitialTemp" name="trigger_initial_temp_C" value="250.0" step="10">
+            </div>
+
+            <div class="field-group" id="groupISC" style="display:none;">
+              <label for="inputIscResistance">Dahili Kısa Devre Direnci R_isc (Ω):</label>
+              <input type="number" step="0.005" id="inputIscResistance" name="isc_resistance_ohm" value="0.05" min="0.001">
+            </div>
+
+            <div class="field-row" id="groupOven" style="display:none;">
+              <div class="field-group">
+                <label for="inputOvenTarget">Fırın Hedef Sıcaklığı (°C):</label>
+                <input type="number" step="5" id="inputOvenTarget" name="oven_target_temp_C" value="130.0" min="50">
+              </div>
+              <div class="field-group">
+                <label for="inputOvenRamp">Artış Hızı (°C/dk):</label>
+                <input type="number" step="0.5" id="inputOvenRamp" name="oven_ramp_C_per_min" value="5.0" min="0.5">
+              </div>
             </div>
           </div>
 
@@ -489,43 +629,138 @@
             </button>
           </div>
 
-          <!-- TASARIM ÇALIŞMASI PANELİ (DESIGN STUDY / PARAMETER SWEEP) -->
+          <!-- TASARIM ÇALIŞMASI PANELİ (DESIGN STUDY / PARAMETER SWEEP / 2D GRID / TORNADO) -->
           <div class="props-section" id="panelDesignStudy" style="display:none;">
-            <p class="props-desc">Farklı hücre aralıkları, separatör bariyer malzemeleri veya soğutma seviyelerini aynı anda simüle edip en güvenli tasarımı otomatik tespit edin.</p>
+            <p class="props-desc">1D Pareto taraması, 2D Çoklu Parametre Isı Haritası veya OAT Tornado Duyarlılık Analizini paralel motor ve canlı SSE takibiyle çalıştırın.</p>
 
             <div class="field-group">
-              <label for="selectSweepType">Tarama Türü (Sweep Type):</label>
-              <select id="selectSweepType">
-                <option value="spacing_sweep" selected>Hücre Aralığı Taraması (1.5, 2.0, 2.5, 3.0 mm)</option>
-                <option value="separator_sweep">Termal Bariyer Kıyaslaması (Hava, Mika, Aerojel)</option>
-                <option value="cooling_sweep">Soğutma Kapasitesi Kıyaslaması (Pasif, 400, 800, 1500 W/m²K)</option>
+              <label for="selectStudyMode">Çalışma Modu (Optimization Mode):</label>
+              <select id="selectStudyMode">
+                <option value="1d_pareto" selected>1D Parametrik Tarama & Pareto Cephesi</option>
+                <option value="2d_grid">2D Çoklu Parametre Matrisi (Isı/Risk Haritası)</option>
+                <option value="tornado_oat">Tornado Hassasiyet Analizi (OAT ±%)</option>
               </select>
             </div>
 
-            <div class="metric-mini-card" id="sweepInfoCard">
-              <div class="mini-card-title">TARANACAK VARYASYONLAR</div>
-              <div class="sweep-pills" id="sweepPillsContainer" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
-                <span class="event-pill">1.5 mm</span>
-                <span class="event-pill">2.0 mm</span>
-                <span class="event-pill">2.5 mm</span>
-                <span class="event-pill">3.0 mm</span>
+            <!-- 1D Kontrolleri -->
+            <div id="study1DControls">
+              <div class="field-group">
+                <label for="selectSweepType">Tarama Türü (Sweep Type):</label>
+                <select id="selectSweepType">
+                  <option value="spacing_sweep" selected>Hücre Aralığı Taraması (1.5, 2.0, 2.5, 3.0 mm)</option>
+                  <option value="separator_sweep">Termal Bariyer Kıyaslaması (Hava, Mika, Aerojel)</option>
+                  <option value="cooling_sweep">Soğutma Kapasitesi Kıyaslaması (Pasif, 400, 800, 1500 W/m²K)</option>
+                </select>
+              </div>
+
+              <!-- Çok Amaçlı Optimizasyon Ağırlıkları (Aşama 3) -->
+              <div class="field-row" style="margin-top:6px;">
+                <div class="field-group">
+                  <label for="inputSweepWSafety">Güvenlik Önceliği: <span id="lblWSafety" style="color:#38bdf8; font-weight:700;">%60</span></label>
+                  <input type="range" id="inputSweepWSafety" min="0" max="100" value="60" step="5" style="width:100%;">
+                </div>
+                <div class="field-group">
+                  <label for="inputSweepWMass">Hafiflik Önceliği: <span id="lblWMass" style="color:#a78bfa; font-weight:700;">%40</span></label>
+                  <input type="range" id="inputSweepWMass" min="0" max="100" value="40" step="5" style="width:100%;">
+                </div>
+              </div>
+
+              <div class="metric-mini-card" id="sweepInfoCard" style="margin-top:8px;">
+                <div class="mini-card-title">TARANACAK VARYASYONLAR</div>
+                <div class="sweep-pills" id="sweepPillsContainer" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                  <span class="event-pill">1.5 mm</span>
+                  <span class="event-pill">2.0 mm</span>
+                  <span class="event-pill">2.5 mm</span>
+                  <span class="event-pill">3.0 mm</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2D Grid Kontrolleri -->
+            <div id="study2DControls" style="display:none;">
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="selectGridParamX">X Ekseni Parametresi:</label>
+                  <select id="selectGridParamX">
+                    <option value="spacing_x_mm" selected>X Boşluğu (mm)</option>
+                    <option value="soc_percent">Şarj Seviyesi SOC (%)</option>
+                    <option value="h_cooling_plate_W_per_m2_K">Soğutma h (W/m²K)</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="inputGridValuesX">X Değerleri (virgüllü):</label>
+                  <input type="text" id="inputGridValuesX" value="1.0, 2.0, 3.5">
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="selectGridParamY">Y Ekseni Parametresi:</label>
+                  <select id="selectGridParamY">
+                    <option value="separator_thickness_mm" selected>Bariyer Kalınlığı (mm)</option>
+                    <option value="spacing_y_mm">Y Boşluğu (mm)</option>
+                    <option value="busbar_conductance_W_per_K">Busbar G (W/K)</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="inputGridValuesY">Y Değerleri (virgüllü):</label>
+                  <input type="text" id="inputGridValuesY" value="0.0, 0.5, 1.5">
+                </div>
+              </div>
+            </div>
+
+            <!-- Tornado OAT Kontrolleri -->
+            <div id="studyTornadoControls" style="display:none;">
+              <div class="field-group">
+                <label for="inputTornadoPerturb">Parametre Sapma Oranı (±%):</label>
+                <input type="number" id="inputTornadoPerturb" value="20.0" min="5" max="50" step="5">
+              </div>
+              <div class="metric-mini-card" style="margin-top:6px;">
+                <div class="mini-card-title">OAT DUYARLILIK PARAMETRELERİ</div>
+                <div style="font-size:10px; color:#94a3b8; line-height:1.4; margin-top:4px;">
+                  Hücre Boşluğu, Bariyer Kalınlığı, Ortam Sıcaklığı, Tetikleme Gücü, Konveksiyon Katsayısı ve SOC (%) parametreleri baz nokta etrafında ±% pertürbe edilerek Tornado etki sıralaması çıkarılır.
+                </div>
               </div>
             </div>
 
             <button type="button" id="btnRunDesignStudy" class="btn run-btn" style="width:100%; margin-top:14px;">
-              <span class="btn-icon">📊</span> Tasarım Çalışmasını Başlat (Sweep)
+              <span class="btn-icon">📊</span> Analizi Paralel Motorla Başlat
             </button>
 
-            <!-- Yükleme / İlerleme Durumu -->
-            <div id="studyStatusBox" style="display:none; margin-top:12px; padding:10px; border-radius:6px; background:rgba(2,132,199,0.15); border:1px solid #0284c7; color:#38bdf8; font-size:11px; text-align:center;">
-              ⏳ Tasarım varyasyonları paralel/sıralı simüle ediliyor...
+            <!-- Yükleme / Canlı SSE İlerleme Durumu -->
+            <div id="studyStatusBox" style="display:none; margin-top:12px; padding:10px; border-radius:6px; background:rgba(2,132,199,0.15); border:1px solid #0284c7; color:#38bdf8; font-size:11px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span id="studyProgressText">⏳ Paralel çözücü başlatılıyor...</span>
+                <strong id="studyProgressPct">0%</strong>
+              </div>
+              <div class="sse-progress-track">
+                <div class="sse-progress-fill" id="studyProgressFill" style="width:0%;"></div>
+              </div>
             </div>
 
-            <!-- Sonuçlar Matrisi -->
+            <!-- 1D Sonuçlar Matrisi -->
             <div id="studyResultsContainer" style="display:none; margin-top:14px;">
               <div class="recommendation-banner" id="studyRecBanner" style="background:linear-gradient(135deg, rgba(16,185,129,0.2), rgba(2,132,199,0.2)); border:1px solid #10b981; border-radius:6px; padding:10px; margin-bottom:12px;">
-                <div style="font-size:10px; font-weight:800; color:#34d399; letter-spacing:0.08em;">★ EN GÜVENLİ TASARIM ÖNERİSİ</div>
-                <div id="studyRecText" style="font-size:11px; color:#f1f5f9; margin-top:4px; font-weight:600;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:10px; font-weight:800; color:#34d399; letter-spacing:0.08em;">★ EN İYİ MÜHENDİSLİK DENGESİ (KNEE POINT)</span>
+                  <span id="studyKneeBadge" style="font-size:10px; font-weight:700; background:rgba(52,211,153,0.2); color:#34d399; padding:2px 6px; border-radius:4px;">PARETO OPTİMAL</span>
+                </div>
+                <div id="studyRecText" style="font-size:11px; color:#f1f5f9; margin-top:6px; line-height:1.4;"></div>
+              </div>
+
+              <!-- Pareto Cephesi Grafiği -->
+              <div class="props-subcard" style="margin-bottom:12px;">
+                <div class="subcard-header" style="display:flex; justify-content:space-between;">
+                  <span>KÜTLE vs GÜVENLİK PARETO CEPHESİ</span>
+                  <span style="font-size:9px; color:#94a3b8;">X: Kütle (kg) | Y: Risk Skoru</span>
+                </div>
+                <div style="position:relative; width:100%; height:160px; background:#0b0f17; border-radius:6px; margin-top:6px; overflow:hidden; border:1px solid #1e293b;">
+                  <canvas id="paretoCanvas" width="320" height="160" style="width:100%; height:100%; display:block;"></canvas>
+                </div>
+                <div style="display:flex; justify-content:space-around; font-size:9px; color:#94a3b8; margin-top:6px;">
+                  <span><span style="color:#10b981; font-weight:800;">★</span> Diz Noktası (Knee)</span>
+                  <span><span style="color:#38bdf8; font-weight:800;">●</span> Pareto Cephesi</span>
+                  <span><span style="color:#64748b; font-weight:800;">○</span> Domine Edilen</span>
+                </div>
               </div>
 
               <div class="subcard-header">KARŞILAŞTIRMALI MÜHENDİSLİK MATRİSİ</div>
@@ -535,8 +770,9 @@
                     <tr style="border-bottom:1px solid var(--border); color:var(--text-dim); text-align:left;">
                       <th style="padding:6px 4px;">Tasarım</th>
                       <th style="padding:6px 4px;">Risk</th>
-                      <th style="padding:6px 4px;">Pik T</th>
-                      <th style="padding:6px 4px;">Kaçak</th>
+                      <th style="padding:6px 4px;">Kütle</th>
+                      <th style="padding:6px 4px;">ΔKütle</th>
+                      <th style="padding:6px 4px; text-align:center;">Pareto</th>
                       <th style="padding:6px 4px; text-align:center;">İncele</th>
                     </tr>
                   </thead>
@@ -544,6 +780,146 @@
                     <!-- JS ile dinamik doldurulur -->
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <!-- 2D Izgara Matris Sonuçları -->
+            <div id="study2DResultsContainer" style="display:none; margin-top:14px;">
+              <div class="props-subcard">
+                <div class="subcard-header" style="display:flex; justify-content:space-between;">
+                  <span>2D RİSK VE SICAKLIK ISI HARİTASI</span>
+                  <span style="font-size:9px; color:#38bdf8;">Hücreye Tıklayarak İnceleyin</span>
+                </div>
+                <div id="study2DGridWrapper" style="overflow-x:auto; margin-top:8px;"></div>
+              </div>
+            </div>
+
+            <!-- Tornado Hassasiyet Sonuçları -->
+            <div id="studyTornadoResultsContainer" style="display:none; margin-top:14px;">
+              <div class="recommendation-banner" style="background:rgba(245,158,11,0.12); border:1px solid #f59e0b; border-radius:6px; padding:9px; margin-bottom:10px;">
+                <div style="font-size:9px; font-weight:800; color:#fbbf24; letter-spacing:0.06em;">★ EN HASSAS PARAMETRE (DOMINANT DRIVER)</div>
+                <div id="tornadoTopParamText" style="font-size:11px; color:#f8fafc; margin-top:4px; font-weight:600;">--</div>
+              </div>
+              <div class="props-subcard">
+                <div class="subcard-header">TORNADO ETKİ SIRALAMASI (ΔT_peak SALINIMI °C)</div>
+                <div style="position:relative; width:100%; height:195px; margin-top:6px;">
+                  <canvas id="tornadoChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KANIT VE VALİDASYON PANELİ (EVIDENCE & VALIDATION ENGINE - AŞAMA 2) -->
+          <div class="props-section" id="panelValidation" style="display:none;">
+            <p class="props-desc">Laboratuvar kalorimetre (ARC/DSC) veya test sensör logunu yükleyerek modeli doğrulayın ve Monte Carlo belirsizlik bantlarını (P10/P50/P90) hesaplayın.</p>
+
+            <div class="props-subcard">
+              <div class="subcard-header">1. DENEYSEL SENSÖR LOGU KALİBRASYONU (CSV)</div>
+              <p style="font-size:10px; color:#94a3b8; margin:4px 0 8px 0;">Zaman-sıcaklık verilerini içeren CSV dosyasını seçin veya metin olarak yapıştırın:</p>
+              
+              <div class="field-group">
+                <label for="inputValidationCsvFile">Sensör CSV Dosyası:</label>
+                <input type="file" id="inputValidationCsvFile" accept=".csv,.txt" style="font-size:11px;">
+              </div>
+
+              <div class="field-group">
+                <label for="textareaValidationCsv">Veya CSV Verisini Yapıştırın:</label>
+                <textarea id="textareaValidationCsv" rows="4" style="width:100%; font-size:10px; font-family:monospace; background:#0b0f17; color:#38bdf8; border:1px solid #334155; border-radius:4px; padding:6px;" placeholder="time_s,temperature_C&#10;0.0, 25.0&#10;10.0, 110.0&#10;15.0, 320.0&#10;20.0, 750.0"></textarea>
+              </div>
+
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="inputValCompareCell">Hedef Hücre:</label>
+                  <input type="number" id="inputValCompareCell" value="0" min="0">
+                </div>
+                <div class="field-group" style="align-self:flex-end;">
+                  <button type="button" id="btnRunValidationCompare" class="btn run-btn" style="width:100%; padding:7px 10px; font-size:11px;">
+                    <span class="btn-icon">🔬</span> Kalibre Et & Doğrula
+                  </button>
+                </div>
+              </div>
+
+              <button type="button" id="btnOpenAutoCalibrateModal" class="btn ghost-btn" style="width:100%; margin-top:8px; font-size:11px; border-color:#0284c7; color:#38bdf8;">
+                <span>⚡</span> Otomatik Arrhenius Ters Problem Optimizasyonu (Auto-Fit)
+              </button>
+
+              <div id="validationResultCard" style="display:none; margin-top:10px; padding:10px; border-radius:6px; background:#0f172a; border:1px solid #3b82f6;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:10px; font-weight:700; color:#94a3b8;">VALİDASYON GÜVEN SKORU</span>
+                  <span id="valScoreBadge" style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:10px; background:#10b981; color:#ffffff;">%94.2</span>
+                </div>
+                <div id="valVerdictText" style="font-size:10px; color:#f1f5f9; margin-top:6px; line-height:1.4;"></div>
+                <div class="props-data-grid" style="margin-top:8px;">
+                  <div class="data-item">
+                    <span class="data-label">RMSE Hatası:</span>
+                    <span class="data-value" id="valRmseVal">-- °C</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">ΔT Pik Hatası:</span>
+                    <span class="data-value" id="valDeltaPeakVal">-- °C</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">Δt Kaçak Hatası:</span>
+                    <span class="data-value" id="valDeltaTimeVal">-- s</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">Pik Sıcaklıklar:</span>
+                    <span class="data-value" id="valPeaksComp">-- / --</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="props-subcard" style="margin-top:12px;">
+              <div class="subcard-header">2. BELİRSİZLİK NİCELENDİRMESİ (MONTE CARLO UQ)</div>
+              <p style="font-size:10px; color:#94a3b8; margin:4px 0 8px 0;">Kinetik ve venting parametreleri tolerans bandında pertürbe edilerek istatistiksel güvenlik zarfları (P10, P50, P90) çıkarılır.</p>
+
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="inputMcSamples">Örneklem Sayısı (N):</label>
+                  <input type="number" id="inputMcSamples" value="15" min="5" max="50">
+                </div>
+                <div class="field-group">
+                  <label for="inputMcVariance">Varyans Toleransı (±%):</label>
+                  <input type="number" id="inputMcVariance" value="5.0" step="0.5" min="1" max="20">
+                </div>
+              </div>
+
+              <button type="button" id="btnRunMonteCarlo" class="btn" style="width:100%; margin-top:8px; background:#475569; color:#f8fafc; font-size:11px;">
+                <span class="btn-icon">🎲</span> Monte Carlo UQ Analizini Çalıştır
+              </button>
+
+              <div id="mcStatusBox" style="display:none; margin-top:8px; padding:8px; border-radius:6px; background:rgba(148,163,184,0.1); border:1px solid #475569; font-size:10px; color:#cbd5e1;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span id="mcProgressText">⏳ Monte Carlo varyasyonları çözülüyor...</span>
+                  <strong id="mcProgressPct">0%</strong>
+                </div>
+                <div class="sse-progress-track">
+                  <div class="sse-progress-fill" id="mcProgressFill" style="width:0%; background:#a78bfa;"></div>
+                </div>
+              </div>
+
+              <div id="mcResultCard" style="display:none; margin-top:10px; padding:10px; border-radius:6px; background:#0f172a; border:1px solid #8b5cf6;">
+                <div style="font-size:10px; font-weight:800; color:#a78bfa; letter-spacing:0.06em;">İSTATİSTİKSEL GÜVENİLİRLİK ZARFLARI</div>
+                <div id="mcSummaryText" style="font-size:10px; color:#e2e8f0; margin-top:6px; line-height:1.4;"></div>
+                <div class="props-data-grid" style="margin-top:8px;">
+                  <div class="data-item">
+                    <span class="data-label">P10 (İyimser):</span>
+                    <span class="data-value" id="mcValP10" style="color:#34d399;">-- °C</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">P50 (Medyan):</span>
+                    <span class="data-value" id="mcValP50" style="color:#60a5fa;">-- °C</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">P90 (Muhafazakâr):</span>
+                    <span class="data-value" id="mcValP90" style="color:#f87171;">-- °C</span>
+                  </div>
+                  <div class="data-item">
+                    <span class="data-label">Belirsizlik Bandı:</span>
+                    <span class="data-value" id="mcValCiWidth">±-- °C</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -577,19 +953,88 @@
                   <span class="data-value" id="valPeakTemp">--</span>
                 </div>
                 <div class="data-item">
-                  <span class="data-label">Hash İmzası:</span>
+                  <span class="data-label">Modül Kütlesi:</span>
+                  <span class="data-value" id="valModuleMass">-- kg</span>
+                </div>
+                <div class="data-item" style="grid-column: span 2;">
+                  <span class="data-label">SHA-256 Konfigürasyon İmzası:</span>
                   <span class="data-value mono" id="valHash">--</span>
                 </div>
               </div>
             </div>
 
-            <div class="results-actions">
+            <!-- GAZ SALINIMI VE PATLAMA ANALİZİ (NFPA 68) -->
+            <div class="props-subcard" id="gasHazardCard" style="margin-top:10px;">
+              <div class="subcard-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>GAZ & PATLAMA TEHLİKESİ (NFPA 68)</span>
+                <span id="valGasLelBadge" class="reg-badge-pass">-- % LEL</span>
+              </div>
+              <div class="props-data-grid">
+                <div class="data-item">
+                  <span class="data-label">Toplam Gaz (STP):</span>
+                  <span class="data-value" id="valGasTotalL">-- L</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Karışım LEL Sınırı:</span>
+                  <span class="data-value" id="valGasMixLel">-- %</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Tepe İç Basınç (ΔP):</span>
+                  <span class="data-value" id="valGasPeakPressure">-- kPa</span>
+                </div>
+                <div class="data-item">
+                  <span class="data-label">Min. Tahliye Alanı:</span>
+                  <span class="data-value" id="valGasMinVent">-- cm²</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- REGÜLASYON UYUMLULUK MATRİSİ (GB 38031 / UL 9540A / UN 38.3) -->
+            <div class="props-subcard" id="regComplianceCard" style="margin-top:10px;">
+              <div class="subcard-header">REGÜLASYON ÖN-UYUMLULUK MATRİSİ</div>
+              <div class="reg-compliance-list">
+                <div class="reg-compliance-row">
+                  <div>
+                    <div class="reg-std-name">GB 38031 / ECE R100 (5-Dk Kuralı)</div>
+                    <div class="reg-std-desc" id="regDescGb38031">Yolcu tahliyesi için ≥300s yayılım gecikmesi</div>
+                  </div>
+                  <span id="regBadgeGb38031" class="reg-badge-neutral">--</span>
+                </div>
+                <div class="reg-compliance-row">
+                  <div>
+                    <div class="reg-std-name">UL 9540A Seviye 2 (Modül Kapsama)</div>
+                    <div class="reg-std-desc" id="regDescUl9540a">Tek hücrede sınırlama değerlendirmesi</div>
+                  </div>
+                  <span id="regBadgeUl9540a" class="reg-badge-neutral">--</span>
+                </div>
+                <div class="reg-compliance-row">
+                  <div>
+                    <div class="reg-std-name">UN 38.3 T.2 (Termal Kararlılık)</div>
+                    <div class="reg-std-desc" id="regDescUn383">Taşımacılık fırın testi güvenlik sınırı</div>
+                  </div>
+                  <span id="regBadgeUn383" class="reg-badge-neutral">--</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="results-actions" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
               <button type="button" class="btn ghost-btn" id="btnSideOpenCharts" style="width:100%;">
                 📈 Sıcaklık Grafiğini Aç
               </button>
-              <a id="btnSideDownloadReport" href="#" target="_blank" class="btn ghost-btn" style="width:100%; text-decoration:none; text-align:center; display:none;">
-                📄 UL 9540A Raporunu İndir
+              <a id="btnSideDownloadReport" href="#" target="_blank" class="btn run-btn" style="width:100%; text-decoration:none; text-align:center; display:none; padding:8px;">
+                📄 UL 9540A Raporunu İndir (PDF)
               </a>
+              <div id="exportActionGroup" style="display:none; gap:6px; margin-top:2px;">
+                <a id="btnSideDownloadCsv" href="#" target="_blank" class="btn ghost-btn" style="flex:1; text-decoration:none; text-align:center; font-size:10px; padding:6px 4px;">
+                  📊 CSV Dışa Aktar
+                </a>
+                <a id="btnSideDownloadNpz" href="#" target="_blank" class="btn ghost-btn" style="flex:1; text-decoration:none; text-align:center; font-size:10px; padding:6px 4px;">
+                  💾 İkili (.NPZ)
+                </a>
+              </div>
+              <button type="button" class="btn ghost-btn" id="btnSideAuditCert" style="width:100%; display:none; font-size:10px; color:#38bdf8; border-color:#0284c7;">
+                🔒 Kriptografik Denetim Sertifikası
+              </button>
             </div>
           </div>
 
@@ -736,6 +1181,58 @@
   </div>
 </div>
 
+<!-- 1b. KRİPTOGRAFİK DENETİM SERTİFİKASI MODALI -->
+<div id="auditCertModal" class="modal" style="display:none; z-index:350;">
+  <div class="modal-content" style="max-width:560px; background:#0b0f17; border:1px solid #0284c7; border-radius:8px; padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:10px;">
+      <div>
+        <span style="font-size:10px; font-weight:800; color:#38bdf8; letter-spacing:0.08em;">KRİPTOGRAFİK MÜHENDİSLİK DENETİM SERTİFİKASI</span>
+        <h3 style="margin:2px 0 0 0; font-size:15px; color:#f8fafc;" id="modalCertTitle">TR-CERT-XXXXXXXX</h3>
+      </div>
+      <span class="modal-close" id="closeAuditCertModal" style="font-size:20px; color:#94a3b8; cursor:pointer;">&times;</span>
+    </div>
+
+    <div style="margin-top:14px; background:rgba(16,185,129,0.1); border:1px solid #10b981; border-radius:6px; padding:10px; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:20px;">🛡️</span>
+      <div>
+        <div style="font-weight:700; font-size:11px; color:#34d399;">DEĞİŞMEZ VE İZLENİR (AUDIT-PROOF) ONAY</div>
+        <div style="font-size:10px; color:#cbd5e1;">Bu simülasyon ve sonuçları SHA-256 ve Git Commit karması ile kriptografik olarak kilitlenmiştir.</div>
+      </div>
+    </div>
+
+    <div class="props-data-grid" style="margin-top:14px;">
+      <div class="data-item" style="grid-column: span 2;">
+        <span class="data-label">Konfigürasyon SHA-256:</span>
+        <span class="data-value mono" id="modalCertSha" style="font-size:9px; word-break:break-all; color:#38bdf8;">--</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Yazılım Git Sürümü:</span>
+        <span class="data-value mono" id="modalCertGit" style="color:#e2e8f0;">--</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Çözücü Yöntemi:</span>
+        <span class="data-value" id="modalCertSolver" style="color:#e2e8f0;">--</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Zaman Damgası (UTC):</span>
+        <span class="data-value" id="modalCertTime" style="color:#e2e8f0;">--</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Kütüphane Onayı:</span>
+        <span class="data-value" id="modalCertLib" style="color:#e2e8f0;">--</span>
+      </div>
+      <div class="data-item" style="grid-column: span 2;">
+        <span class="data-label">Denetim URN:</span>
+        <span class="data-value mono" id="modalCertUrn" style="font-size:9px; color:#94a3b8;">--</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; text-align:right;">
+      <button type="button" class="btn ghost-btn" id="btnCloseAuditCert" style="padding:6px 14px; font-size:11px;">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <!-- 2. KÜTÜPHANE YÖNETİCİSİ MODALI -->
 <div id="libManagerModal" class="modal" style="display:none; z-index:400;">
   <div class="modal-content lib-modal-content">
@@ -848,29 +1345,53 @@
     </div>
     <div class="modal-body">
       <form id="formCustomFormat">
-        <div class="field-group">
-          <label>Format Adı:</label>
-          <input type="text" id="cf_name" placeholder="Örn: 46950" required>
-        </div>
         <div class="field-row">
           <div class="field-group">
+            <label>Format Adı:</label>
+            <input type="text" id="cf_name" placeholder="Örn: 46950 veya Pouch_80Ah" required>
+          </div>
+          <div class="field-group">
+            <label>Geometri Türü:</label>
+            <select id="cf_type">
+              <option value="cylindrical" selected>Silindirik (Cylindrical)</option>
+              <option value="prismatic">Prizmatik (Prismatic)</option>
+              <option value="pouch">Pouch / Kese (Laminate)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group" id="cfRadiusGroup">
             <label>Yarıçap (mm):</label>
-            <input type="number" step="any" id="cf_r" placeholder="23" required>
+            <input type="number" step="any" id="cf_r" value="23">
           </div>
           <div class="field-group">
             <label>Yükseklik (mm):</label>
-            <input type="number" step="any" id="cf_h" placeholder="95" required>
+            <input type="number" step="any" id="cf_h" value="95" required>
+          </div>
+        </div>
+        <div class="field-row" id="cfPlanarFields" style="display:none;">
+          <div class="field-group">
+            <label>Genişlik / En (mm):</label>
+            <input type="number" step="any" id="cf_w" value="220">
+          </div>
+          <div class="field-group">
+            <label>Hücre Kalınlığı (mm):</label>
+            <input type="number" step="any" id="cf_thick" value="12">
           </div>
         </div>
         <div class="field-row">
           <div class="field-group">
             <label>Toplam Kütle (kg):</label>
-            <input type="number" step="any" id="cf_mass" placeholder="0.42" required>
+            <input type="number" step="any" id="cf_mass" value="0.42" required>
           </div>
           <div class="field-group">
-            <label>Kasa Kalınlığı (mm):</label>
-            <input type="number" step="any" id="cf_t" value="0.3" required>
+            <label>Özgül Isı Cp (J/kgK):</label>
+            <input type="number" step="10" id="cf_cp" value="1050" required>
           </div>
+        </div>
+        <div class="field-group">
+          <label>Kasa / Kılıf Et Kalınlığı (mm):</label>
+          <input type="number" step="any" id="cf_t" value="0.3" required>
         </div>
         <button type="submit" class="btn run-btn" style="width:100%; margin-top:12px;">Kaydet ve Kütüphaneye Ekle</button>
       </form>
@@ -907,6 +1428,134 @@
         </div>
         <button type="submit" class="btn run-btn" style="width:100%; margin-top:12px;">Kaydet ve Kütüphaneye Ekle</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- 6. PROJELER YÖNETİMİ MODALI (z-index: 450) -->
+<div id="projectsModal" class="modal" style="display:none; z-index:450;">
+  <div class="modal-content" style="max-width:580px; background:#0f172a; border:1px solid #0284c7; border-radius:8px; padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px;">📁</span>
+        <h3 style="margin:0; font-size:15px; color:#f8fafc;">Kayıtlı Projeler & Tasarımlar</h3>
+      </div>
+      <span class="modal-close" id="closeProjectsModal" style="cursor:pointer; font-size:20px;">&times;</span>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="field-row">
+        <input type="text" id="inputProjectName" placeholder="Yeni Proje Adı (Örn: Model Y 4680 Modül Rev A)" style="flex:2; font-size:11px;">
+        <button type="button" id="btnSaveCurrentProject" class="btn run-btn" style="flex:1; font-size:11px; padding:6px 12px;">SQLite'a Kaydet</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button type="button" id="btnExportTrsim" class="btn ghost-btn" style="flex:1; font-size:11px; border-color:#0284c7; color:#38bdf8;">⬇️ .trsim Dosyası İndir (Dışa Aktar)</button>
+        <button type="button" id="btnImportTrsim" class="btn ghost-btn" style="flex:1; font-size:11px;">⬆️ .trsim Dosyası Yükle (İçe Aktar)</button>
+        <input type="file" id="inputImportTrsimFile" accept=".trsim,.json" style="display:none;">
+      </div>
+      <div style="margin-top:14px; max-height:260px; overflow-y:auto;" id="projectsListContainer">
+        <!-- JS ile SQLite kayıtlı projeler listelenir -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. RUN A vs RUN B KARŞILAŞTIRMA MODALI (z-index: 450) -->
+<div id="compareModal" class="modal" style="display:none; z-index:450;">
+  <div class="modal-content" style="max-width:720px; background:#0f172a; border:1px solid #3b82f6; border-radius:8px; padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px;">⚖️</span>
+        <h3 style="margin:0; font-size:15px; color:#f8fafc;">Run A vs Run B Tasarım Karşılaştırması</h3>
+      </div>
+      <span class="modal-close" id="closeCompareModal" style="cursor:pointer; font-size:20px;">&times;</span>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="field-row">
+        <div class="field-group">
+          <label>Temel Simülasyon (Run A):</label>
+          <select id="selectCompareJobA" style="font-size:11px;"></select>
+        </div>
+        <div class="field-group">
+          <label>Kıyaslanan Simülasyon (Run B):</label>
+          <select id="selectCompareJobB" style="font-size:11px;"></select>
+        </div>
+        <div class="field-group" style="align-self:flex-end;">
+          <button type="button" id="btnExecuteCompare" class="btn run-btn" style="font-size:11px; padding:7px 14px;">Kıyasla</button>
+        </div>
+      </div>
+      <div id="compareResultsArea" style="display:none; margin-top:14px;">
+        <div id="compareDeltaCards" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:12px;"></div>
+        <div style="height:220px; background:#0b0f15; border-radius:6px; border:1px solid #1e293b; padding:8px;">
+          <canvas id="compareChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. OTOMATİK ARRHENIUS KALİBRASYON MODALI (z-index: 550) -->
+<div id="autoCalibrateModal" class="modal" style="display:none; z-index:550;">
+  <div class="modal-content" style="max-width:680px; background:#0f172a; border:1px solid #38bdf8; border-radius:8px; padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px;">⚡</span>
+        <div>
+          <h3 style="margin:0; font-size:15px; color:#f8fafc;">Otomatik Kinetik Ters Kalibrasyon (Auto-Fit)</h3>
+          <span style="font-size:10px; color:#38bdf8;">ARC / F848 Test Sıcaklık Logundan Arrhenius Parametrelerini Türet</span>
+        </div>
+      </div>
+      <span class="modal-close" id="closeAutoCalibrateModal" style="cursor:pointer; font-size:20px;">&times;</span>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="field-row">
+        <div class="field-group">
+          <label>Hücre Kütlesi (kg):</label>
+          <input type="number" step="0.005" id="acCellMass" value="0.048">
+        </div>
+        <div class="field-group">
+          <label>Isı Sığası Cp (J/kg.K):</label>
+          <input type="number" step="50" id="acCellCp" value="950">
+        </div>
+        <div class="field-group">
+          <label>Aktif Madde Oranı:</label>
+          <input type="number" step="0.05" id="acActiveRatio" value="0.60">
+        </div>
+      </div>
+      <div class="field-group" style="margin-top:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>Deneysel Sıcaklık-Zaman Verisi (CSV):</label>
+          <button type="button" id="btnLoadDemoArcCsv" class="btn ghost-btn micro-btn" style="color:#38bdf8; font-size:10px;">Örnek ARC CSV Doldur</button>
+        </div>
+        <textarea id="acCsvContent" rows="5" style="width:100%; font-size:10px; font-family:monospace; background:#0b0f17; color:#38bdf8; border:1px solid #334155; border-radius:4px; padding:6px; margin-top:4px;" placeholder="time_s,temperature_C&#10;0.0, 25.0&#10;12.0, 155.0&#10;18.0, 220.0&#10;22.0, 680.0"></textarea>
+      </div>
+      <button type="button" id="btnRunAutoCalibrate" class="btn run-btn" style="width:100%; margin-top:8px;">
+        <span>🚀</span> En Küçük Kareler (Least-Squares) ile Modeli Otomatik Kalibre Et
+      </button>
+
+      <div id="acResultArea" style="display:none; margin-top:12px; background:#0b0f17; border-radius:6px; border:1px solid #0284c7; padding:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; color:#34d399; font-size:12px;" id="acSummaryTitle">Optimizasyon Başarılı!</span>
+          <span style="font-size:11px; color:#38bdf8; font-weight:700;" id="acR2Badge">R² = 0.998</span>
+        </div>
+        <div class="props-data-grid" style="margin-top:8px;">
+          <div class="data-item"><span class="data-label">Frekans Çarpanı (A):</span><span class="data-value" id="acValA">--</span></div>
+          <div class="data-item"><span class="data-label">Aktivasyon (Ea):</span><span class="data-value" id="acValEa">-- kJ/mol</span></div>
+          <div class="data-item"><span class="data-label">Reaksiyon Entalpisi (ΔH):</span><span class="data-value" id="acValDh">-- J/g</span></div>
+          <div class="data-item"><span class="data-label">RMSE:</span><span class="data-value" id="acValRmse">-- °C</span></div>
+        </div>
+        <div style="height:150px; margin-top:10px;">
+          <canvas id="acFitChart"></canvas>
+        </div>
+        <div class="field-row" style="margin-top:10px; align-items:center;">
+          <input type="text" id="acChemName" placeholder="Kimya Adı (Örn: ARC_NMC811_Lab)" value="ARC_Kalibre_Hücre" style="font-size:11px;">
+          <button type="button" id="btnSaveCalibratedChemToLib" class="btn ghost-btn" style="font-size:11px; border-color:#10b981; color:#34d399;">
+            📥 Kalıcı Kütüphaneye Kaydet
+          </button>
+        </div>
+        <button type="button" id="btnApplyCalibratedChem" class="btn run-btn" style="width:100%; margin-top:8px; background:#059669;">
+          ✓ Bu Kimyayı Çalışma Alanına Uygula ve Seç
+        </button>
+      </div>
     </div>
   </div>
 </div>

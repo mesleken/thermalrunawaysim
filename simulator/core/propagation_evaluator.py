@@ -6,6 +6,8 @@ Faz 0.5 Sözleşme 4 ve Sözleşme 5'e tam uyumludur.
 """
 
 from typing import Dict, Any, List, Optional
+import math
+import numpy as np
 from simulator.core.constants import PropagationStatus
 from simulator.core.solver import SimulationResult
 
@@ -26,7 +28,8 @@ class PropagationEvaluation:
         uncertainty_bounds: Dict[str, Any],
         regulatory_summary: str,
         confidence_level: str = "high",
-        confidence_message: str = ""
+        confidence_message: str = "",
+        regulatory_compliance: Optional[Dict[str, Any]] = None
     ):
         self.status = status
         self.time_to_first_propagation_s = time_to_first_propagation_s
@@ -42,10 +45,12 @@ class PropagationEvaluation:
         self.regulatory_summary = regulatory_summary
         self.confidence_level = confidence_level
         self.confidence_message = confidence_message
+        self.regulatory_compliance = regulatory_compliance or {}
 
     def to_dict(self) -> Dict[str, Any]:
+        status_str = self.status.value if hasattr(self.status, "value") else str(self.status)
         return {
-            "status": self.status.value,
+            "status": status_str,
             "time_to_first_propagation_s": self.time_to_first_propagation_s,
             "total_cells": self.total_cells,
             "affected_cells_count": self.affected_cells_count,
@@ -58,7 +63,8 @@ class PropagationEvaluation:
             "uncertainty_bounds": self.uncertainty_bounds,
             "regulatory_summary": self.regulatory_summary,
             "confidence_level": self.confidence_level,
-            "confidence_message": self.confidence_message
+            "confidence_message": self.confidence_message,
+            "regulatory_compliance": self.regulatory_compliance
         }
 
 
@@ -74,7 +80,12 @@ _DEFAULT_ONSET_C = 155.0
 class PropagationEvaluator:
     """Zaman serisi ve hücre olaylarını analiz eden değerlendirici motor."""
 
-    def evaluate(self, result: SimulationResult, trigger_cell_id: int) -> PropagationEvaluation:
+    def evaluate(
+        self,
+        result: SimulationResult,
+        trigger_cell_id: int,
+        connections: Optional[List[Any]] = None
+    ) -> PropagationEvaluation:
         cells = result.cell_summaries
         total_cells = len(cells)
 
@@ -106,33 +117,135 @@ class PropagationEvaluator:
         else:
             time_to_first_prop = None
 
-        # Yayılım grafiği (Directed Propagation Graph)
-        path_graph: List[Dict[str, Any]] = []
-        for i in range(len(runaway_cells) - 1):
-            source = runaway_cells[i]
-            target = runaway_cells[i + 1]
-            dt = target["runaway_time_s"] - source["runaway_time_s"]
-            path_graph.append({
-                "from_cell_id": source["cell_id"],
-                "from_cell_name": source["name"],
-                "to_cell_id": target["cell_id"],
-                "to_cell_name": target["name"],
-                "delta_t_s": round(dt, 3)
-            })
+        # Fiziksel komşuluk haritası (connections mevcutsa gerçek topoloji ve temas alanı ağırlığı)
+        adjacency: Dict[int, Dict[int, float]] = {}
+        if connections:
+            for conn in connections:
+                u = getattr(conn, "cell_i_id", None)
+                v = getattr(conn, "cell_j_id", None)
+                if u is not None and v is not None:
+                    area = float(getattr(conn, "contact_area_m2", 1e-3))
+                    gap = max(1e-5, float(getattr(conn, "surface_gap_m", 2e-3)))
+                    weight = area / gap
+                    adjacency.setdefault(u, {})[v] = adjacency.get(u, {}).get(v, 0.0) + weight
+                    adjacency.setdefault(v, {})[u] = adjacency.get(v, {}).get(u, 0.0) + weight
 
-        # Komşu hücrelerin termal güvenlik marjı (Containment Margin)
-        # Use the actual onset temp for each cell's chemistry
+        time_pts = np.array(getattr(result, "time_points_s", []), dtype=np.float64)
+        temp_hist = getattr(result, "temperature_history_C", {}) or {}
+
+        def _get_temp_series(cid: int) -> Optional[np.ndarray]:
+            arr = temp_hist.get(cid)
+            if arr is None:
+                arr = temp_hist.get(str(cid))
+            return np.array(arr, dtype=np.float64) if arr is not None else None
+
+        # Nedensel Yayılım Grafiği (Causal Directed Propagation DAG - Isı Akısı & Komşuluk Tabanlı)
+        path_graph: List[Dict[str, Any]] = []
+
+        for i, target in enumerate(runaway_cells):
+            t_cid = target["cell_id"]
+            if t_cid == trigger_cell_id or i == 0:
+                continue
+
+            t_tr_target = float(target["runaway_time_s"])
+            prior_cells = [c for c in runaway_cells[:i] if float(c["runaway_time_s"]) <= t_tr_target]
+            if not prior_cells:
+                prior_cells = runaway_cells[:i]
+
+            best_source = None
+            target_x = float(target.get("pos_x_mm", target.get("pos_x", 0.0)))
+            target_y = float(target.get("pos_y_mm", target.get("pos_y", 0.0)))
+            t_series_target = _get_temp_series(t_cid)
+
+            # 1. Öncelik: Gerçek topolojik komşular arasında kümülatif ısı transferi integrali en yüksek ebeveyn
+            direct_neighbors = adjacency.get(t_cid, {})
+            prior_direct = [c for c in prior_cells if c["cell_id"] in direct_neighbors]
+
+            if prior_direct and len(time_pts) > 1 and t_series_target is not None:
+                best_heat_score = -1.0
+                mask = time_pts <= (t_tr_target + 1e-6)
+                t_sub = time_pts[mask] if np.sum(mask) >= 2 else time_pts[:2]
+                target_sub = t_series_target[:len(t_sub)]
+
+                for cand in prior_direct:
+                    u_cid = cand["cell_id"]
+                    u_series = _get_temp_series(u_cid)
+                    g_weight = direct_neighbors[u_cid]
+                    if u_series is not None:
+                        u_sub = u_series[:len(t_sub)]
+                        delta_T_pos = np.maximum(0.0, u_sub - target_sub)
+                        heat_integral = float(np.trapezoid(delta_T_pos, t_sub)) * g_weight
+                    else:
+                        heat_integral = g_weight
+                    if heat_integral > best_heat_score:
+                        best_heat_score = heat_integral
+                        best_source = cand
+
+            # 2. Yedek (Fallback): Uzaysal Öklid mesafesi (pos_x_mm, pos_y_mm) ve sıcaklık sürüşü
+            if best_source is None:
+                min_dist = float("inf")
+                for cand in prior_cells:
+                    cx = float(cand.get("pos_x_mm", cand.get("pos_x", 0.0)))
+                    cy = float(cand.get("pos_y_mm", cand.get("pos_y", 0.0)))
+                    dist = math.hypot(cx - target_x, cy - target_y)
+                    if dist < min_dist - 1e-6:
+                        min_dist = dist
+                        best_source = cand
+                    elif abs(dist - min_dist) <= 1e-6:
+                        if best_source is None or cand["runaway_time_s"] > best_source["runaway_time_s"]:
+                            best_source = cand
+
+            if best_source is not None:
+                dt = target["runaway_time_s"] - best_source["runaway_time_s"]
+                path_graph.append({
+                    "from_cell_id": best_source["cell_id"],
+                    "from_cell_name": best_source["name"],
+                    "to_cell_id": target["cell_id"],
+                    "to_cell_name": target["name"],
+                    "delta_t_s": round(max(0.0, dt), 3)
+                })
+
+        # Komşu hücrelerin termal güvenlik marjı (Containment Margin - Dinamik T_onset_C)
         non_trigger_cells = [c for c in cells if c["cell_id"] != trigger_cell_id]
         if non_trigger_cells:
             margins = []
             for c in non_trigger_cells:
-                onset = _CHEMISTRY_ONSET_C.get(c.get("chemistry_id", ""), _DEFAULT_ONSET_C)
+                if c.get("T_onset_C") is not None:
+                    onset = float(c["T_onset_C"])
+                else:
+                    onset = _CHEMISTRY_ONSET_C.get(c.get("chemistry_id", ""), _DEFAULT_ONSET_C)
                 margins.append(onset - c["max_temperature_C"])
             min_margin = min(margins)
         else:
             min_margin = 0.0
 
         peak_temp = max(c["max_temperature_C"] for c in cells)
+
+        # Regülasyon Uyumluluk Değerlendirmesi
+        gb_38031_pass = bool(affected_count <= 1 or (time_to_first_prop is not None and time_to_first_prop >= 300.0))
+        ul_9540a_pass = bool(affected_count <= 1)
+        un_383_pass = bool(peak_temp <= 170.0 and affected_count == 0)
+
+        regulatory_compliance = {
+            "gb_38031_5min_egress": {
+                "standard": "GB 38031-2020 / ECE R100.03",
+                "passed": gb_38031_pass,
+                "required_seconds": 300.0,
+                "actual_first_propagation_s": time_to_first_prop,
+                "egress_margin_s": round(time_to_first_prop - 300.0, 1) if time_to_first_prop is not None else None,
+                "verdict": "UYGUN (>=5 dk yolcu tahliye süresi korundu)" if gb_38031_pass else "UYGUN DEĞİL (Yayılım 300s altında gerçekleşti)"
+            },
+            "ul_9540a_unit_level": {
+                "standard": "UL 9540A Unit Level",
+                "passed": ul_9540a_pass,
+                "verdict": "UYGUN (Tetikleyici hücreyle sınırlandırıldı)" if ul_9540a_pass else "RİSKLİ (Hücreler arası yayılım gerçekleşti)"
+            },
+            "un_383_thermal_abuse": {
+                "standard": "UN 38.3.4.2 Termal Fırın Testi",
+                "passed": un_383_pass,
+                "verdict": "UYGUN (Tepe sıcaklık tehlikeli eşiğin altında)" if un_383_pass else "BİLGİ (Kaçak reaksiyonu veya yüksek tepe sıcaklığı)"
+            }
+        }
 
         # Calculate risk score dynamically based on actual metrics (0-100)
         risk_score = self._calculate_risk_score(
@@ -182,7 +295,8 @@ class PropagationEvaluator:
             min_containment_margin_C=min_margin,
             risk_score_100=risk_score,
             uncertainty_bounds=uncertainty_bounds,
-            regulatory_summary=reg_summary
+            regulatory_summary=reg_summary,
+            regulatory_compliance=regulatory_compliance
         )
 
     def _calculate_risk_score(
